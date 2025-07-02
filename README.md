@@ -2,7 +2,7 @@
 
 A modern, open source, self-hosted Markdown knowledge base. Organize, search, and tag your notes and documentation with a beautiful, responsive web interface.
 
-![Screenshot](screenshot.png)
+![Screenshot](MDKB.jpg)
 
 ## Features
 - Secure login with cookie-based authentication
