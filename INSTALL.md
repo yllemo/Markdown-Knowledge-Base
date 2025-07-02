@@ -1,95 +1,48 @@
 # Installation Guide
 
-## Quick Setup for Windows
+# Markdown Knowledge Base (MDKB)
+A modern, self-hosted web application for organizing and managing your documentation and notes. Built with PHP and featuring a clean, responsive interface, it allows you to create, edit, and organize Markdown files with powerful tagging and search capabilities.
 
-### Option 1: XAMPP (Recommended)
+## Key Features:
 
-1. **Download XAMPP**
-   - Go to: https://www.apachefriends.org/download.html
-   - Download the Windows version (PHP 8.x)
 
-2. **Install XAMPP**
-   - Run the installer
-   - Choose default installation path: `C:\xampp\`
-   - Select Apache and PHP components
+![Screenshot](MDKB2.jpg)
 
-3. **Copy Knowledge Base Files**
-   - Copy your Knowledge Base folder to: `C:\xampp\htdocs\knowledge-base\`
+### 1. Files:
 
-4. **Start Apache**
-   - Open XAMPP Control Panel
-   - Click "Start" next to Apache
-   - Wait for Apache to start (green status)
+Create, edit, and delete Markdown files through a web interface
+Automatic file management with modification timestamps and file size tracking
+Secure file storage in a dedicated content directory with proper access controls
 
-5. **Access Your Knowledge Base**
-   - Open browser and go to: `http://localhost/knowledge-base/`
-   - You should see the setup page
+### 2. Tags:
 
-### Option 2: Standalone PHP
+Organize content with flexible tagging system for easy categorization
+Browse and filter files by tags for quick navigation
+Tag-based search functionality to find related content across your knowledge base
 
-1. **Download PHP**
-   - Go to: https://windows.php.net/download/
-   - Download "Thread Safe" version (ZIP file)
+### 3. Markdown Editor:
 
-2. **Extract PHP**
-   - Extract to: `C:\php\`
-   - Copy `php.ini-development` to `php.ini`
+Built-in Markdown editor with syntax highlighting and auto-save functionality
+Customizable editor settings including font size and theme preferences
+Split-pane view with real-time editing and synchronized scrolling
 
-3. **Add to PATH**
-   - Open System Properties → Environment Variables
-   - Add `C:\php\` to PATH variable
+### 4. Markdown Preview:
 
-4. **Test Installation**
-   - Open Command Prompt
-   - Run: `php -v`
-   - Should show PHP version
+Live preview of rendered Markdown content as you type
+Side-by-side editor and preview panes for seamless writing experience
+Fullscreen mode for focused writing or reading
 
-5. **Start Server**
-   - Navigate to your Knowledge Base folder
-   - Run: `php -S localhost:8000`
-   - Access: `http://localhost:8000`
+### 5. Download:
 
-## Troubleshooting
-
-### "PHP not recognized" Error
-- Make sure PHP is added to your system PATH
-- Restart Command Prompt after adding to PATH
-- Try using the full path: `C:\php\php.exe -S localhost:8000`
-
-### "Permission Denied" Error
-- Run Command Prompt as Administrator
-- Check folder permissions
-- Make sure `content/` folder is writable
-
-### Blank Page
-- Check if PHP is working: visit `http://localhost:8000/test.php`
-- Check browser console for errors
-- Check server logs for PHP errors
-
-### Redirect Issues
-- Visit `http://localhost:8000/debug.php` to see debug information
-- Check if all files are in the correct location
-- Verify `config.php` exists and is readable
-
-## File Structure After Installation
-
-```
-C:\xampp\htdocs\knowledge-base\  (or your chosen location)
-├── index.php
-├── login.php
-├── setup.php
-├── config.php
-├── api/
-├── assets/
-├── classes/
-├── content/
-└── ... (other files)
-```
+Export individual Markdown files for backup or sharing
+Secure download API with authentication and file validation
+Maintains original file names and formatting during download
+The application features secure cookie-based authentication, responsive design for desktop and mobile,
 
 ## First Time Setup
 
 1. **Access Setup Page**
-   - Go to: `http://localhost/knowledge-base/setup.php`
+   - Go to: `http://(webserver)/knowledge-base/setup.php`
    - Or just visit the main URL and it will redirect
 
 2. **Configure Settings**
