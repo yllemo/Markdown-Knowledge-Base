@@ -1,0 +1,256 @@
+<?php
+// index.php - Main interface for the Knowledge Base System
+
+// Start output buffering to prevent header issues
+ob_start();
+
+require_once 'config.php';
+
+// Check authentication
+if (!isAuthenticated()) {
+    header('Location: login.php');
+    exit;
+}
+
+// Include required classes
+require_once 'classes/FileManager.php';
+require_once 'classes/SearchEngine.php';
+require_once 'classes/TagManager.php';
+
+$fileManager = new FileManager();
+$searchEngine = new SearchEngine();
+$tagManager = new TagManager();
+
+// Get all files and tags for initial load
+$files = $fileManager->getAllFiles();
+$allTags = $tagManager->getAllTags();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?></title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button id="mobileMenuBtn" class="mobile-menu-btn" style="display: none;">☰</button>
+                <h1 id="headerTitle" style="cursor: pointer;">📚 <?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?></h1>
+            </div>
+            <div class="header-actions">
+                <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
+                <button id="newFileBtn" class="btn btn-primary">+ New File</button>
+                <button id="settingsBtn" class="btn btn-secondary" title="Settings">⚙️</button>
+                <a href="logout.php" class="btn btn-danger" title="Logout">🚪</a>
+            </div>
+        </header>
+
+        <!-- Mobile Overlay -->
+        <div id="mobileOverlay" class="mobile-overlay"></div>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>📁 Files <span class="section-count"><?= count($files) ?></span></h3>
+                    <div class="section-actions">
+                        <button class="section-btn active" onclick="window.kb.showRecent('files')">Recent</button>
+                        <button class="section-btn" onclick="window.kb.browseAll('files')">Browse All</button>
+                    </div>
+                    <div id="fileList" class="file-list">
+                        <?php 
+                        $displayFiles = array_slice($files, 0, 15); // Reduced limit
+                        foreach ($displayFiles as $file): ?>
+                            <div class="file-item" data-file="<?= htmlspecialchars($file['name']) ?>">
+                                <span class="file-name" title="<?= htmlspecialchars($file['display_name']) ?>"><?= htmlspecialchars($file['display_name']) ?></span>
+                                <span class="file-date"><?= date('M j', $file['modified']) ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3>🏷️ Tags <span class="section-count"><?= count($allTags) ?></span></h3>
+                    <div class="section-actions">
+                        <button class="section-btn active" onclick="window.kb.showPopular('tags')">Popular</button>
+                        <button class="section-btn" onclick="window.kb.browseAll('tags')">Browse All</button>
+                    </div>
+                    <div id="tagList" class="tag-list">
+                        <?php 
+                        $displayTags = array_slice($allTags, 0, 10, true); // Reduced limit
+                        foreach ($displayTags as $tag => $count): ?>
+                            <div class="tag-item" data-tag="<?= htmlspecialchars($tag) ?>">
+                                <span class="tag-name" title="<?= htmlspecialchars($tag) ?>"><?= htmlspecialchars($tag) ?></span>
+                                <span class="tag-count"><?= $count ?></span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <div class="editor-container" id="editorContainer" style="display: none;">
+                <div class="editor-header">
+                    <input type="text" id="fileTitle" placeholder="File title..." class="title-input">
+                    <div class="editor-actions">
+                        <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;">👁️ Preview</button>
+                        <button id="saveBtn" class="btn btn-success">💾 Save</button>
+                        <button id="deleteBtn" class="btn btn-danger">🗑️ Delete</button>
+                        <button id="downloadBtn" class="btn btn-primary">⬇️ Download</button>
+                        <button id="closeBtn" class="btn btn-secondary">✕ Close</button>
+                    </div>
+                </div>
+                
+                <div class="editor-meta">
+                    <div class="tags-input-container">
+                        <input type="text" id="fileTags" placeholder="Tags (space or comma-separated)..." class="tags-input">
+                        <span class="tags-help" title="Type tags with spaces and they'll automatically be converted to comma-separated format">ⓘ</span>
+                    </div>
+                </div>
+
+                <div class="editor-content">
+                    <div class="editor-pane">
+                        <h4>📝 Editor</h4>
+                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..."></textarea>
+                    </div>
+                    <div class="preview-pane">
+                        <h4>👁️ Preview</h4>
+                        <div id="markdownPreview" class="markdown-preview"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <div class="welcome-content">
+                    <h2>Welcome to Your Knowledge Base</h2>
+                    <p>Select a file from the sidebar to start editing, or create a new file to begin.</p>
+                    <div class="welcome-stats">
+                        <div class="stat" id="welcomeFilesStat" style="cursor: pointer;">
+                            <span class="stat-number"><?= count($files) ?></span>
+                            <span class="stat-label">Files</span>
+                        </div>
+                        <div class="stat" id="welcomeTagsStat" style="cursor: pointer;">
+                            <span class="stat-number"><?= count($allTags) ?></span>
+                            <span class="stat-label">Tags</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Browse Modal -->
+    <div id="browseModal" class="browse-modal">
+        <div class="browse-content">
+            <div class="browse-header">
+                <h2 id="browseTitle">Browse All Files</h2>
+                <button class="close-modal" onclick="window.kb.closeBrowseModal()">✕</button>
+            </div>
+            <input type="text" id="browseSearch" class="browse-search" placeholder="Search...">
+            <div id="browseList" class="browse-list">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="settings-modal">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h2>⚙️ Settings</h2>
+                <button class="close-modal" onclick="window.kb.closeSettingsModal()">✕</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <h3>General Settings</h3>
+                    <div class="setting-group">
+                        <label for="siteTitle">Site Title</label>
+                        <input type="text" id="siteTitle" placeholder="Enter site title...">
+                    </div>
+                    <div class="setting-group">
+                        <label for="sessionTimeout">Session Timeout (minutes)</label>
+                        <input type="number" id="sessionTimeout" min="5" max="1440" step="5">
+                    </div>
+                    <div class="setting-group">
+                        <label for="sidebarWidth">Sidebar Width (pixels)</label>
+                        <input type="number" id="sidebarWidth" min="200" max="500" step="10">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Editor Settings</h3>
+                    <div class="setting-group">
+                        <label for="editorFontSize">Editor Font Size (pixels)</label>
+                        <input type="number" id="editorFontSize" min="10" max="24" step="1">
+                    </div>
+                    <div class="setting-group">
+                        <label for="autoSaveInterval">Auto-save Interval (seconds)</label>
+                        <input type="number" id="autoSaveInterval" min="5" max="300" step="5">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Security Settings</h3>
+                    <div class="setting-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="passwordProtected">
+                            Enable password protection
+                        </label>
+                    </div>
+                    <div class="setting-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" placeholder="Enter current password...">
+                    </div>
+                    <div class="setting-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" placeholder="Enter new password...">
+                    </div>
+                    <div class="setting-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" placeholder="Confirm new password...">
+                    </div>
+                    <button id="changePasswordBtn" class="btn btn-primary">Change Password</button>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Backup Settings</h3>
+                    <div class="setting-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="backupEnabled">
+                            Enable automatic backups
+                        </label>
+                    </div>
+                    <div class="setting-group">
+                        <label for="backupInterval">Backup Interval (hours)</label>
+                        <input type="number" id="backupInterval" min="1" max="168" step="1">
+                    </div>
+                    <div class="setting-group">
+                        <label for="maxBackups">Maximum Backups</label>
+                        <input type="number" id="maxBackups" min="1" max="100" step="1">
+                    </div>
+                </div>
+            </div>
+            <div class="settings-footer">
+                <button id="saveSettingsBtn" class="btn btn-success">💾 Save Settings</button>
+                <button id="resetSettingsBtn" class="btn btn-secondary">🔄 Reset to Defaults</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden input for file operations -->
+    <input type="hidden" id="currentFile" value="">
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>

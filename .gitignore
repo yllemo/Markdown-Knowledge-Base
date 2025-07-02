@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Dependency/vendor
+node_modules/
+vendor/
+
+# Logs
+*.log
+
+# Environment/config
+.env
+config.custom.php
+
+# Backups
+*~
+*.bak
+
+# PHP session files
+sess_*
+
+# Misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log* 

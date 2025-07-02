@@ -1,0 +1,9 @@
+# Minimal .htaccess for Knowledge Base System
+# If this still causes errors, delete this file and access directly via index.php
+
+RewriteEngine On
+
+# Basic API routing - only if mod_rewrite is available
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/([^/]+)/?$ api/$1.php [L]
