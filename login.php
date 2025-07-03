@@ -185,7 +185,7 @@ $site_title = getConfig('site_title', 'Knowledge Base');
             
             <div class="login-footer">
                 <p>Secure cookie-based authentication</p>
-                <p><a href="login.php?debug=1">Debug Mode</a> | <a href="debug-auth.php">Full Debug</a></p>
+                <p><a href="login.php?debug=1">Debug Mode</a> | <a href="debug.php">Full Debug</a></p>
             </div>
         </div>
     </div>

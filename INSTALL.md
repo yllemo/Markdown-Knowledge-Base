@@ -271,6 +271,7 @@ $config['search_results_limit'] = 50;
 // Backup settings
 $config['auto_backup'] = true;
 $config['backup_retention_days'] = 30;
+$config['backup_directory'] = '.backups';  // In root of MDKB installation
 ```
 
 ## Security Best Practices
@@ -309,8 +310,8 @@ $config['backup_retention_days'] = 30;
 # backup-mdkb.sh - Daily backup script
 
 DATE=$(date +%Y%m%d)
-BACKUP_DIR="/backups/mdkb"
 SOURCE_DIR="/var/www/mdkb"
+BACKUP_DIR="$SOURCE_DIR/.backups"  # In the root of MDKB installation
 
 # Create backup directory
 mkdir -p $BACKUP_DIR

@@ -2,6 +2,7 @@
 // debug.php - Debug authentication state
 
 require_once 'config.php';
+requireAuthentication();
 
 echo "<h1>Authentication Debug</h1>";
 

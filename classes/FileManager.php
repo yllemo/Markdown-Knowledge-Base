@@ -176,7 +176,7 @@ class FileManager {
     }
     
     private function createBackup($filePath) {
-        $backupDir = $this->contentDir . '/.backups';
+        $backupDir = dirname($this->contentDir) . '/.backups';
         if (!is_dir($backupDir)) {
             mkdir($backupDir, 0755, true);
         }
@@ -192,7 +192,7 @@ class FileManager {
     }
     
     private function cleanOldBackups($fileName) {
-        $backupDir = $this->contentDir . '/.backups';
+        $backupDir = dirname($this->contentDir) . '/.backups';
         $pattern = $backupDir . '/*_' . $fileName;
         $backups = glob($pattern);
         

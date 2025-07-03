@@ -343,7 +343,15 @@ class KnowledgeBase {
         buttons.forEach(btn => btn.classList.remove('active'));
         
         if (type === 'tags') {
-            buttons[3].classList.add('active');
+            // Find the tags section and activate its button
+            const sidebarSections = document.querySelectorAll('.sidebar-section');
+            sidebarSections.forEach(section => {
+                const header = section.querySelector('h3');
+                if (header && header.textContent.includes('Tags')) {
+                    const tagBtn = section.querySelector('.section-btn');
+                    if (tagBtn) tagBtn.classList.add('active');
+                }
+            });
             this.renderTagList(this.allTags);
         }
     }
