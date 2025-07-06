@@ -44,6 +44,7 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 - Auto-save and backup support
 - Browse and filter by tags or files
 - Dark and light themes
+- Custom favicon and header icon support
 
 ## Quick Start
 
@@ -105,6 +106,13 @@ For production environments:
 ## Configuration
 - All settings are in `config.php` (or override in `config.custom.php`).
 - Change password, session timeout, file size/type, and more.
+
+### Customization
+- **Favicon**: Upload a custom favicon (JPG, PNG, GIF, SVG, ICO) in Settings → Appearance
+- **Header Icon**: Add a custom header icon that appears next to the site title
+- **Site Title**: Customize the title displayed in the header and browser tab
+- **Theme**: Choose between dark and light themes
+- **Editor Settings**: Adjust font size, auto-save interval, and more
 
 ## Contributing
 

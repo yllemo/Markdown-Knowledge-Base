@@ -83,6 +83,8 @@ class KnowledgeBase {
         this.resetSettingsBtn.addEventListener('click', () => this.resetSettings());
         this.changePasswordBtn.addEventListener('click', () => this.changePassword());
         
+        // File upload operations will be bound when settings modal opens
+        
         // Mobile toggle button
         if (this.mobileToggleBtn) {
             this.mobileToggleBtn.addEventListener('click', () => this.toggleMobilePreview());
@@ -456,6 +458,8 @@ class KnowledgeBase {
         if (this.settingsModal) {
             this.settingsModal.classList.add('show');
             this.loadSettings();
+            // Re-bind file upload events when modal opens
+            this.bindFileUploadEvents();
         }
     }
 
@@ -480,6 +484,10 @@ class KnowledgeBase {
             document.getElementById('backupEnabled').checked = settings.backup_enabled || false;
             document.getElementById('backupInterval').value = Math.floor((settings.backup_interval || 86400) / 3600);
             document.getElementById('maxBackups').value = settings.max_backups || 10;
+            
+            // Load favicon and header icon
+            this.updateFileDisplay('favicon', settings.favicon_path);
+            this.updateFileDisplay('header_icon', settings.header_icon_path);
             
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -606,6 +614,48 @@ class KnowledgeBase {
         }
     }
 
+    bindFileUploadEvents() {
+        console.log('Binding file upload events...');
+        
+        // Get file upload elements
+        this.faviconUpload = document.getElementById('faviconUpload');
+        this.headerIconUpload = document.getElementById('headerIconUpload');
+        this.removeFaviconBtn = document.getElementById('removeFaviconBtn');
+        this.removeHeaderIconBtn = document.getElementById('removeHeaderIconBtn');
+        
+        console.log('File upload elements:', {
+            faviconUpload: !!this.faviconUpload,
+            headerIconUpload: !!this.headerIconUpload,
+            removeFaviconBtn: !!this.removeFaviconBtn,
+            removeHeaderIconBtn: !!this.removeHeaderIconBtn
+        });
+        
+        // Remove existing event listeners if any
+        if (this.faviconUpload) {
+            this.faviconUpload.removeEventListener('change', this.faviconUploadHandler);
+            this.faviconUploadHandler = (e) => this.handleFileUpload(e, 'favicon');
+            this.faviconUpload.addEventListener('change', this.faviconUploadHandler);
+        }
+        
+        if (this.headerIconUpload) {
+            this.headerIconUpload.removeEventListener('change', this.headerIconUploadHandler);
+            this.headerIconUploadHandler = (e) => this.handleFileUpload(e, 'header_icon');
+            this.headerIconUpload.addEventListener('change', this.headerIconUploadHandler);
+        }
+        
+        if (this.removeFaviconBtn) {
+            this.removeFaviconBtn.removeEventListener('click', this.removeFaviconHandler);
+            this.removeFaviconHandler = () => this.removeFile('favicon');
+            this.removeFaviconBtn.addEventListener('click', this.removeFaviconHandler);
+        }
+        
+        if (this.removeHeaderIconBtn) {
+            this.removeHeaderIconBtn.removeEventListener('click', this.removeHeaderIconHandler);
+            this.removeHeaderIconHandler = () => this.removeFile('header_icon');
+            this.removeHeaderIconBtn.addEventListener('click', this.removeHeaderIconHandler);
+        }
+    }
+
     // Mobile functionality
     setupMobileView() {
         this.handleResize();
@@ -641,8 +691,6 @@ class KnowledgeBase {
         });
     }
 
-
-
     togglePaneFullscreen(pane) {
         const editorContainer = this.editorContainer;
         const otherPane = pane.classList.contains('editor-pane') ? 
@@ -651,6 +699,7 @@ class KnowledgeBase {
         const sidebar = document.querySelector('.sidebar');
         const header = document.querySelector('.app-header');
         const body = document.body;
+        const previewPaneHeader = document.getElementById('previewPaneHeader');
 
         if (pane.classList.contains('fullscreen')) {
             // Exit fullscreen
@@ -659,6 +708,10 @@ class KnowledgeBase {
             editorContainer.classList.remove('single-pane');
             if (header) header.style.display = '';
             body.classList.remove('fullscreen-mode');
+            // Restore preview header text
+            if (pane.classList.contains('preview-pane') && previewPaneHeader) {
+                previewPaneHeader.textContent = '👁️ Preview';
+            }
         } else {
             // Enter fullscreen
             pane.classList.add('fullscreen');
@@ -666,6 +719,11 @@ class KnowledgeBase {
             editorContainer.classList.add('single-pane');
             if (header) header.style.display = 'none';
             body.classList.add('fullscreen-mode');
+            // Set preview header to file title
+            if (pane.classList.contains('preview-pane') && previewPaneHeader) {
+                const title = this.fileTitle && this.fileTitle.value ? this.fileTitle.value.trim() : '';
+                previewPaneHeader.textContent = title || '👁️ Preview';
+            }
         }
         // Always restore sidebar/header if exiting fullscreen
         if (!document.querySelector('.editor-pane.fullscreen') && !document.querySelector('.preview-pane.fullscreen')) {
@@ -1325,6 +1383,141 @@ class KnowledgeBase {
                 }
             }, 300);
         }, 3000);
+    }
+
+    async handleFileUpload(event, type) {
+        console.log(`handleFileUpload called for ${type}`, event);
+        
+        const file = event.target.files[0];
+        if (!file) {
+            console.log('No file selected');
+            return;
+        }
+
+        console.log(`File selected: ${file.name}, Size: ${file.size}, Type: ${file.type}`);
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/svg+xml', 'image/x-icon'];
+        if (!allowedTypes.includes(file.type)) {
+            console.error('Invalid file type:', file.type);
+            this.showNotification('Invalid file type. Only images are allowed.', 'error');
+            return;
+        }
+
+        // Validate file size (2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            console.error('File too large:', file.size);
+            this.showNotification('File size too large. Maximum 2MB allowed.', 'error');
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', type);
+
+            console.log('Sending upload request...');
+            const response = await fetch('api/upload.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log('Upload response status:', response.status);
+            const result = await response.json();
+            console.log('Upload response:', result);
+
+            if (result.success) {
+                console.log('Upload successful!');
+                this.showNotification(result.message, 'success');
+                this.updateFileDisplay(type, result.file_path);
+                // Reload page to apply changes
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                console.error('Upload failed:', result.error);
+                this.showNotification(result.error || 'Upload failed', 'error');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showNotification('Upload failed', 'error');
+        }
+    }
+
+    updateFileDisplay(type, filePath) {
+        console.log(`updateFileDisplay called for ${type} with path: ${filePath}`);
+        
+        const containerId = type === 'favicon' ? 'currentFavicon' : 'currentHeaderIcon';
+        const removeBtnId = type === 'favicon' ? 'removeFaviconBtn' : 'removeHeaderIconBtn';
+        const container = document.getElementById(containerId);
+        const removeBtn = document.getElementById(removeBtnId);
+
+        console.log('Elements found:', {
+            containerId,
+            removeBtnId,
+            container: !!container,
+            removeBtn: !!removeBtn
+        });
+
+        if (!container) {
+            console.error(`Container not found: ${containerId}`);
+            return;
+        }
+
+        if (filePath && filePath !== 'null') {
+            // Show the uploaded file
+            container.innerHTML = `
+                <div class="file-info">
+                    <img src="${filePath}" alt="${type.replace('_', ' ')}" onerror="this.style.display='none'">
+                    <div class="file-name">${filePath.split('/').pop()}</div>
+                </div>
+            `;
+            if (removeBtn) removeBtn.style.display = 'inline-block';
+            console.log(`Updated display for ${type} with file: ${filePath}`);
+        } else {
+            // Show no file message
+            container.innerHTML = '<span class="no-file">No ' + type.replace('_', ' ') + ' uploaded</span>';
+            if (removeBtn) removeBtn.style.display = 'none';
+            console.log(`Cleared display for ${type}`);
+        }
+    }
+
+    async removeFile(type) {
+        if (!confirm(`Are you sure you want to remove the ${type.replace('_', ' ')}?`)) {
+            return;
+        }
+
+        try {
+            // Clear the file path from config
+            const response = await fetch('api/settings.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'update',
+                    settings: {
+                        [type + '_path']: null
+                    }
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(`${type.replace('_', ' ')} removed successfully`, 'success');
+                this.updateFileDisplay(type, null);
+                // Reload page to apply changes
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                this.showNotification(result.error || 'Failed to remove file', 'error');
+            }
+        } catch (error) {
+            console.error('Remove file error:', error);
+            this.showNotification('Failed to remove file', 'error');
+        }
     }
 }
 

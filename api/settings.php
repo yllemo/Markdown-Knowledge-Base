@@ -49,7 +49,9 @@ function handleGet() {
         'auto_save_interval' => getConfig('auto_save_interval'),
         'backup_enabled' => getConfig('backup_enabled'),
         'backup_interval' => getConfig('backup_interval'),
-        'max_backups' => getConfig('max_backups')
+        'max_backups' => getConfig('max_backups'),
+        'favicon_path' => getConfig('favicon_path'),
+        'header_icon_path' => getConfig('header_icon_path')
     ];
     
     echo json_encode($settings);

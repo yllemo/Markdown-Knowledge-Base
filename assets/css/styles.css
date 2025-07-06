@@ -603,6 +603,65 @@ body {
     justify-content: flex-end;
 }
 
+/* Upload container styles */
+.upload-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.current-file {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.current-file img {
+    max-width: 100%;
+    max-height: 40px;
+    border-radius: 4px;
+}
+
+.current-file .no-file {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.current-file .file-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.current-file .file-name {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.current-file .file-size {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.upload-container .btn {
+    align-self: flex-start;
+}
+
+.upload-container small {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
 /* Editor Container */
 .editor-container {
     display: flex;
@@ -884,6 +943,15 @@ body {
 .markdown-preview th {
     background-color: var(--bg-secondary);
     font-weight: 600;
+}
+
+.markdown-preview a {
+    color: #4aa3ff;
+    text-decoration: underline;
+    transition: color 0.2s;
+}
+.markdown-preview a:hover {
+    color: #82cfff;
 }
 
 /* Button Styles */

@@ -31,6 +31,11 @@ $allTags = $tagManager->getAllTags();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?></title>
+    <?php 
+    $favicon_path = getConfig('favicon_path');
+    if ($favicon_path && file_exists($favicon_path)): ?>
+    <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($favicon_path) ?>">
+    <?php endif; ?>
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css">
 </head>
@@ -40,7 +45,16 @@ $allTags = $tagManager->getAllTags();
         <header class="app-header">
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <button id="mobileMenuBtn" class="mobile-menu-btn" style="display: none;">☰</button>
-                <h1 id="headerTitle" style="cursor: pointer;">📚 <?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?></h1>
+                <h1 id="headerTitle" style="cursor: pointer;">
+                    <?php 
+                    $header_icon_path = getConfig('header_icon_path');
+                    if ($header_icon_path && file_exists($header_icon_path)): ?>
+                        <img src="<?= htmlspecialchars($header_icon_path) ?>" alt="Header Icon" style="width: 24px; height: 24px; margin-right: 8px; vertical-align: middle;">
+                    <?php else: ?>
+                        📚
+                    <?php endif; ?>
+                    <?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?>
+                </h1>
             </div>
             <div class="header-actions">
                 <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
@@ -120,7 +134,7 @@ $allTags = $tagManager->getAllTags();
                         <textarea id="markdownEditor" placeholder="Start writing your markdown here..."></textarea>
                     </div>
                     <div class="preview-pane">
-                        <h4>👁️ Preview</h4>
+                        <h4 id="previewPaneHeader">👁️ Preview</h4>
                         <div id="markdownPreview" class="markdown-preview"></div>
                     </div>
                 </div>
@@ -181,6 +195,34 @@ $allTags = $tagManager->getAllTags();
                     <div class="setting-group">
                         <label for="sidebarWidth">Sidebar Width (pixels)</label>
                         <input type="number" id="sidebarWidth" min="200" max="500" step="10">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Appearance Settings</h3>
+                    <div class="setting-group">
+                        <label for="faviconUpload">Favicon</label>
+                        <div class="upload-container">
+                            <div class="current-file" id="currentFavicon">
+                                <span class="no-file">No favicon uploaded</span>
+                            </div>
+                            <input type="file" id="faviconUpload" accept="image/*" style="display: none;">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('faviconUpload').click()">Choose File</button>
+                            <button type="button" class="btn btn-danger" id="removeFaviconBtn" style="display: none;">Remove</button>
+                        </div>
+                        <small>Upload an image file (JPG, PNG, GIF, SVG, ICO). Max 2MB.</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="headerIconUpload">Header Icon</label>
+                        <div class="upload-container">
+                            <div class="current-file" id="currentHeaderIcon">
+                                <span class="no-file">No header icon uploaded</span>
+                            </div>
+                            <input type="file" id="headerIconUpload" accept="image/*" style="display: none;">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('headerIconUpload').click()">Choose File</button>
+                            <button type="button" class="btn btn-danger" id="removeHeaderIconBtn" style="display: none;">Remove</button>
+                        </div>
+                        <small>Upload an image file (JPG, PNG, GIF, SVG, ICO). Max 2MB.</small>
                     </div>
                 </div>
                 
