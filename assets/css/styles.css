@@ -1222,6 +1222,22 @@ body {
         font-size: 0.8rem;
     }
     
+    /* Hide button text on mobile, show only icons */
+    .header-actions .btn {
+        position: relative;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+    
+    /* Hide text content on mobile */
+    .header-actions .btn .btn-text {
+        display: none;
+    }
+    
     .browse-content {
         width: 95%;
         padding: 1rem;
@@ -1258,6 +1274,11 @@ body {
         flex: 1;
         width: auto;
         margin-right: 0.5rem;
+    }
+    
+    /* Ensure button text is hidden on smaller screens too */
+    .header-actions .btn .btn-text {
+        display: none;
     }
     
     .editor-header {

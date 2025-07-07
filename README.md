@@ -38,6 +38,7 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 ## Key Features
 - Secure login with cookie-based authentication
 - Create, edit, and delete Markdown files
+- Load existing .md files from your local storage
 - Tagging and search for fast organization
 - Responsive design (desktop & mobile)
 - File uploads with type/size restrictions
@@ -100,6 +101,7 @@ For production environments:
 ## Usage
 - Log in with your configured password.
 - Create, edit, and tag Markdown notes.
+- **Load existing .md files**: Click the "📁 Load" button to import .md files from your local storage
 - Use the sidebar or search to find notes.
 - Click the Files/Tags headers or stats to browse all.
 

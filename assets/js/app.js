@@ -53,6 +53,8 @@ class KnowledgeBase {
         
         // Buttons
         this.newFileBtn = document.getElementById('newFileBtn');
+        this.loadFileBtn = document.getElementById('loadFileBtn');
+        this.loadFileInput = document.getElementById('loadFileInput');
         this.saveBtn = document.getElementById('saveBtn');
         this.deleteBtn = document.getElementById('deleteBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
@@ -66,6 +68,8 @@ class KnowledgeBase {
         console.log('bindEvents called');
         // File operations
         this.newFileBtn.addEventListener('click', () => this.createNewFile());
+        this.loadFileBtn.addEventListener('click', () => this.loadFileInput.click());
+        this.loadFileInput.addEventListener('change', (e) => this.handleLoadFile(e));
         this.saveBtn.addEventListener('click', () => this.saveFile());
         this.deleteBtn.addEventListener('click', () => this.deleteFile());
         // Remove all previous listeners from downloadBtn
@@ -885,6 +889,131 @@ class KnowledgeBase {
         // Focus on title
         this.fileTitle.focus();
         this.fileTitle.select();
+    }
+
+    async handleLoadFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Check if file is a markdown file
+        if (!file.name.toLowerCase().endsWith('.md') && !file.name.toLowerCase().endsWith('.markdown')) {
+            this.showNotification('Please select a .md or .markdown file', 'error');
+            return;
+        }
+
+        // Check for unsaved changes
+        if (this.unsavedChanges) {
+            if (!confirm('You have unsaved changes. Do you want to continue?')) {
+                event.target.value = ''; // Reset file input
+                return;
+            }
+        }
+
+        try {
+            const content = await this.readFileAsText(file);
+            const fileName = file.name;
+            
+            // Parse the content to extract frontmatter and markdown
+            const parsed = this.parseFrontmatter(content);
+            const metadata = parsed.metadata;
+            const markdownContent = parsed.content;
+            
+            // Set the current file
+            this.currentFile = fileName;
+            this.currentFileInput.value = fileName;
+            
+            // Set the title (use frontmatter title or filename without extension)
+            const title = metadata.title || fileName.replace(/\.(md|markdown)$/i, '');
+            this.fileTitle.value = title;
+            
+            // Set the tags
+            const tags = metadata.tags ? metadata.tags.join(', ') : '';
+            this.fileTags.value = tags;
+            
+            // Set the markdown content
+            this.markdownEditor.value = markdownContent;
+            
+            // Update preview and show editor
+            this.updatePreview();
+            this.showEditor();
+            this.updateActiveFile('');
+            
+            // Mark as unsaved so user can save it
+            this.unsavedChanges = true;
+            this.updateSaveButton();
+            
+            // Close mobile menu when file is loaded
+            if (this.isMobile()) {
+                this.closeMobileMenu();
+            }
+            
+            // Ask user if they want to save the file to the server
+            if (confirm(`File "${fileName}" loaded successfully! Would you like to save it to your knowledge base?`)) {
+                await this.saveLoadedFile(fileName, content, title);
+            } else {
+                this.showNotification(`File "${fileName}" loaded successfully!`, 'success');
+            }
+            
+        } catch (error) {
+            console.error('Error loading file:', error);
+            this.showNotification('Error loading file: ' + error.message, 'error');
+        }
+        
+        // Reset file input
+        event.target.value = '';
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+        });
+    }
+
+    async saveLoadedFile(fileName, content, title) {
+        try {
+            const response = await fetch('api/load.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileName: fileName,
+                    content: content,
+                    title: title
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.error) {
+                this.showNotification('Error saving file: ' + result.error, 'error');
+                return;
+            }
+
+            // Refresh lists
+            await this.refreshFileList();
+            await this.refreshTagList();
+            
+            // Update current file to the saved file
+            this.currentFile = fileName;
+            this.currentFileInput.value = fileName;
+            
+            // Mark as saved
+            this.unsavedChanges = false;
+            this.updateSaveButton();
+            
+            // Update active file
+            this.updateActiveFile(fileName);
+            
+            this.showNotification(`File "${fileName}" saved to knowledge base successfully!`, 'success');
+            
+        } catch (error) {
+            console.error('Error saving loaded file:', error);
+            this.showNotification('Error saving file: ' + error.message, 'error');
+        }
     }
 
     async saveFile() {

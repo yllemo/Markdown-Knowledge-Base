@@ -58,7 +58,8 @@ $allTags = $tagManager->getAllTags();
             </div>
             <div class="header-actions">
                 <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
-                <button id="newFileBtn" class="btn btn-primary">+ New File</button>
+                <button id="newFileBtn" class="btn btn-primary">+<span class="btn-text"> New File</span></button>
+                <button id="loadFileBtn" class="btn btn-secondary" title="Load .md file">📁<span class="btn-text"> Load</span></button>
                 <button id="settingsBtn" class="btn btn-secondary" title="Settings">⚙️</button>
                 <a href="logout.php" class="btn btn-danger" title="Logout">🚪</a>
             </div>
@@ -288,6 +289,9 @@ $allTags = $tagManager->getAllTags();
 
     <!-- Hidden input for file operations -->
     <input type="hidden" id="currentFile" value="">
+    
+    <!-- Hidden file input for loading .md files -->
+    <input type="file" id="loadFileInput" accept=".md,.markdown" style="display: none;">
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>
