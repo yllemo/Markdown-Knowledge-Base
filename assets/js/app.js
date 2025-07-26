@@ -3,6 +3,7 @@
 class KnowledgeBase {
     constructor() {
         this.currentFile = '';
+        this.originalFileTitle = ''; // Track original title to detect changes
         this.unsavedChanges = false;
         this.searchTimeout = null;
         this.isScrollSyncing = false;
@@ -50,6 +51,7 @@ class KnowledgeBase {
         this.markdownEditor = document.getElementById('markdownEditor');
         this.markdownPreview = document.getElementById('markdownPreview');
         this.currentFileInput = document.getElementById('currentFile');
+        // Removed syntax highlighting elements
         
         // Buttons
         this.newFileBtn = document.getElementById('newFileBtn');
@@ -59,6 +61,12 @@ class KnowledgeBase {
         this.deleteBtn = document.getElementById('deleteBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         this.closeBtn = document.getElementById('closeBtn');
+        
+        // Export/Import elements
+        this.exportBtn = document.getElementById('exportBtn');
+        this.importBtn = document.getElementById('importBtn');
+        this.importFileInput = document.getElementById('importFileInput');
+        this.importModal = document.getElementById('importModal');
         
         // Initialize mobile functionality
         this.setupMobileView();
@@ -86,6 +94,11 @@ class KnowledgeBase {
         this.saveSettingsBtn.addEventListener('click', () => this.saveSettings());
         this.resetSettingsBtn.addEventListener('click', () => this.resetSettings());
         this.changePasswordBtn.addEventListener('click', () => this.changePassword());
+        
+        // Export/Import operations
+        this.exportBtn.addEventListener('click', () => this.exportContent());
+        this.importBtn.addEventListener('click', () => this.openImportModal());
+        this.importFileInput.addEventListener('change', (e) => this.handleImportFile(e));
         
         // File upload operations will be bound when settings modal opens
         
@@ -838,6 +851,7 @@ class KnowledgeBase {
             
             // Update UI
             this.fileTitle.value = metadata.title || this.getDisplayName(fileName);
+            this.originalFileTitle = this.fileTitle.value; // Store original title
             this.fileTags.value = (metadata.tags || []).join(', ');
             this.markdownEditor.value = content;
             
@@ -871,6 +885,7 @@ class KnowledgeBase {
         this.currentFileInput.value = fileName;
         
         this.fileTitle.value = 'New Note';
+        this.originalFileTitle = 'New Note'; // Store original title for new files
         this.fileTags.value = '';
         this.markdownEditor.value = '# New Note\n\nStart writing here...';
         
@@ -1033,18 +1048,25 @@ class KnowledgeBase {
 
         const fullContent = this.createFrontmatter(frontmatter) + '\n' + content;
 
+        // Only send title if it has actually changed
+        const requestBody = {
+            action: 'save',
+            file: this.currentFile,
+            content: fullContent
+        };
+
+        // Only include title if it has changed from the original
+        if (title !== this.originalFileTitle) {
+            requestBody.title = title;
+        }
+
         try {
             const response = await fetch('api/files.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    action: 'save',
-                    file: this.currentFile,
-                    content: fullContent,
-                    title: title
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const result = await response.json();
@@ -1056,6 +1078,9 @@ class KnowledgeBase {
 
             this.unsavedChanges = false;
             this.updateSaveButton();
+            
+            // Update the original title to the current title
+            this.originalFileTitle = title;
             
             // Refresh lists
             await this.refreshFileList();
@@ -1252,6 +1277,14 @@ class KnowledgeBase {
             Prism.highlightAllUnder(this.markdownPreview);
         }
     }
+
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
 
     syncScroll(source) {
         if (this.isScrollSyncing) return;
@@ -1648,6 +1681,315 @@ class KnowledgeBase {
             this.showNotification('Failed to remove file', 'error');
         }
     }
+
+    async exportContent() {
+        try {
+            this.showNotification('Preparing export...', 'info');
+            
+            const response = await fetch('api/export.php');
+            
+            // Check if response is JSON (error) or ZIP (success)
+            const contentType = response.headers.get('content-type');
+            
+            if (!response.ok || contentType?.includes('application/json')) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Export failed');
+            }
+            
+            // Create download
+            const blob = await response.blob();
+            
+            // Verify we got a valid blob
+            if (blob.size === 0) {
+                throw new Error('Export file is empty');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Get filename from response headers or create default
+            const contentDisposition = response.headers.get('content-disposition');
+            let filename = 'knowledge-base-export.zip';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename="([^"]+)"/);
+                if (filenameMatch) {
+                    filename = filenameMatch[1];
+                }
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            this.showNotification('Export completed successfully', 'success');
+            
+        } catch (error) {
+            console.error('Export error:', error);
+            this.showNotification(error.message || 'Export failed', 'error');
+        }
+    }
+
+    openImportModal() {
+        if (!this.importModal) return;
+        
+        // Reset modal state
+        this.resetImportModal();
+        this.importModal.classList.add('show');
+        
+        // Bind modal events
+        this.bindImportModalEvents();
+    }
+
+    resetImportModal() {
+        // Show step 1, hide others
+        document.getElementById('importStep1').style.display = 'block';
+        document.getElementById('importStep2').style.display = 'none';
+        document.getElementById('importStep3').style.display = 'none';
+        
+        // Reset buttons
+        document.getElementById('confirmImport').style.display = 'none';
+        document.getElementById('finishImport').style.display = 'none';
+        
+        // Clear file input
+        if (this.importFileInput) {
+            this.importFileInput.value = '';
+        }
+        
+        // Reset stored session
+        this.importSession = null;
+    }
+
+    bindImportModalEvents() {
+        const selectFileBtn = document.getElementById('selectImportFile');
+        const closeModalBtn = document.getElementById('closeImportModal');
+        const cancelBtn = document.getElementById('cancelImport');
+        const confirmBtn = document.getElementById('confirmImport');
+        const finishBtn = document.getElementById('finishImport');
+        const overwriteAllCheck = document.getElementById('overwriteAll');
+        const removeAllFilesCheck = document.getElementById('removeAllFiles');
+        
+        // Remove existing listeners and add new ones
+        selectFileBtn.replaceWith(selectFileBtn.cloneNode(true));
+        document.getElementById('selectImportFile').addEventListener('click', () => {
+            this.importFileInput.click();
+        });
+        
+        closeModalBtn.addEventListener('click', () => this.closeImportModal());
+        cancelBtn.addEventListener('click', () => this.closeImportModal());
+        
+        confirmBtn.addEventListener('click', () => this.confirmImport());
+        finishBtn.addEventListener('click', () => this.closeImportModal());
+        
+        overwriteAllCheck.addEventListener('change', () => this.toggleConflictSelection());
+        removeAllFilesCheck.addEventListener('change', () => this.toggleConflictVisibility());
+    }
+
+    toggleConflictVisibility() {
+        const removeAllFiles = document.getElementById('removeAllFiles').checked;
+        const conflictList = document.getElementById('conflictList');
+        
+        if (removeAllFiles) {
+            // If removing all files, hide conflict options since they become irrelevant
+            conflictList.style.display = 'none';
+        } else {
+            // Show conflict options if there are conflicts and we have import session data
+            if (this.importSession && this.importSession.conflicts && this.importSession.conflicts.length > 0) {
+                conflictList.style.display = 'block';
+            }
+        }
+    }
+
+    closeImportModal() {
+        if (this.importModal) {
+            this.importModal.classList.remove('show');
+        }
+    }
+
+    async handleImportFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        try {
+            this.showNotification('Analyzing import file...', 'info');
+            
+            const formData = new FormData();
+            formData.append('zipFile', file);
+            formData.append('action', 'upload');
+            
+            const response = await fetch('api/import.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Import analysis failed');
+            }
+            
+            this.importSession = result;
+            this.showImportStep2(result);
+            
+        } catch (error) {
+            console.error('Import analysis error:', error);
+            this.showNotification(error.message || 'Import analysis failed', 'error');
+        }
+    }
+
+    showImportStep2(analysisResult) {
+        // Hide step 1, show step 2
+        document.getElementById('importStep1').style.display = 'none';
+        document.getElementById('importStep2').style.display = 'block';
+        
+        // Reset checkbox states
+        document.getElementById('removeAllFiles').checked = false;
+        document.getElementById('overwriteAll').checked = false;
+        
+        // Show summary
+        const summary = document.getElementById('importSummary');
+        summary.innerHTML = `
+            <div class="import-summary">
+                <p><strong>Import Analysis:</strong></p>
+                <ul>
+                    <li>Total files found: ${analysisResult.total_files}</li>
+                    <li>New files: ${analysisResult.new_count}</li>
+                    <li>Conflicting files: ${analysisResult.conflict_count}</li>
+                </ul>
+            </div>
+        `;
+        
+        // Show conflicts if any
+        if (analysisResult.conflicts.length > 0) {
+            this.showConflicts(analysisResult.conflicts);
+        } else {
+            // Hide conflict list if no conflicts
+            document.getElementById('conflictList').style.display = 'none';
+        }
+        
+        // Show confirm button
+        document.getElementById('confirmImport').style.display = 'inline-block';
+    }
+
+    showConflicts(conflicts) {
+        const conflictList = document.getElementById('conflictList');
+        const conflictFiles = document.getElementById('conflictFiles');
+        
+        conflictList.style.display = 'block';
+        
+        const html = conflicts.map(conflict => `
+            <div class="conflict-item">
+                <label>
+                    <input type="checkbox" class="conflict-checkbox" data-filename="${conflict.filename}">
+                    <strong>${conflict.filename}</strong>
+                </label>
+                <div class="conflict-details">
+                    <small>
+                        Existing: ${this.formatFileSize(conflict.existing_size)} (${conflict.existing_modified})<br>
+                        New: ${this.formatFileSize(conflict.new_size)} (${conflict.new_modified})
+                    </small>
+                </div>
+            </div>
+        `).join('');
+        
+        conflictFiles.innerHTML = html;
+    }
+
+    toggleConflictSelection() {
+        const overwriteAll = document.getElementById('overwriteAll').checked;
+        const checkboxes = document.querySelectorAll('.conflict-checkbox');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = overwriteAll;
+            checkbox.disabled = overwriteAll;
+        });
+    }
+
+    async confirmImport() {
+        try {
+            this.showNotification('Importing files...', 'info');
+            
+            const overwriteAll = document.getElementById('overwriteAll').checked;
+            const removeAllFiles = document.getElementById('removeAllFiles').checked;
+            const selectedFiles = [];
+            
+            if (!overwriteAll && !removeAllFiles) {
+                document.querySelectorAll('.conflict-checkbox:checked').forEach(checkbox => {
+                    selectedFiles.push(checkbox.dataset.filename);
+                });
+            }
+            
+            console.log('Import debug - Session ID:', this.importSession.session_id);
+            console.log('Import debug - Remove all files:', removeAllFiles);
+            console.log('Import debug - Import session data:', this.importSession);
+            
+            const formData = new FormData();
+            formData.append('action', 'confirm');
+            formData.append('session_id', this.importSession.session_id);
+            formData.append('overwrite_all', overwriteAll ? 'true' : 'false');
+            formData.append('remove_all_files', removeAllFiles ? 'true' : 'false');
+            formData.append('selected_files', JSON.stringify(selectedFiles));
+            
+            const response = await fetch('api/import.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Import failed');
+            }
+            
+            this.showImportStep3(result);
+            this.loadInitialData(); // Refresh file list
+            
+        } catch (error) {
+            console.error('Import error:', error);
+            this.showNotification(error.message || 'Import failed', 'error');
+        }
+    }
+
+    showImportStep3(importResult) {
+        // Hide step 2, show step 3
+        document.getElementById('importStep2').style.display = 'none';
+        document.getElementById('importStep3').style.display = 'block';
+        
+        // Show results
+        const results = document.getElementById('importResults');
+        results.innerHTML = `
+            <div class="import-results">
+                <p><strong>Import Complete!</strong></p>
+                <ul>
+                    ${importResult.removed_count > 0 ? `<li>🗑️ Removed: ${importResult.removed_count} existing files</li>` : ''}
+                    <li>✅ Imported: ${importResult.imported_count} files</li>
+                    ${importResult.skipped_count > 0 ? `<li>⏭️ Skipped: ${importResult.skipped_count} files</li>` : ''}
+                    ${importResult.error_count > 0 ? `<li>❌ Errors: ${importResult.error_count} files</li>` : ''}
+                </ul>
+                ${importResult.removed_count > 0 ? `
+                    <details>
+                        <summary>Removed Files</summary>
+                        <ul>${importResult.removed.map(file => `<li>${file}</li>`).join('')}</ul>
+                    </details>
+                ` : ''}
+                ${importResult.imported.length > 0 ? `
+                    <details>
+                        <summary>Imported Files</summary>
+                        <ul>${importResult.imported.map(file => `<li>${file}</li>`).join('')}</ul>
+                    </details>
+                ` : ''}
+            </div>
+        `;
+        
+        // Hide confirm, show finish
+        document.getElementById('confirmImport').style.display = 'none';
+        document.getElementById('finishImport').style.display = 'inline-block';
+        
+        this.showNotification('Import completed successfully', 'success');
+    }
+
 }
 
 // Initialize the application when DOM is loaded

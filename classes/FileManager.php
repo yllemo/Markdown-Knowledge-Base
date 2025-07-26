@@ -57,15 +57,62 @@ class FileManager {
     
     public function saveFile($fileName, $content, $title = null) {
         // Sanitize filename
-        $fileName = $this->sanitizeFileName($fileName);
+        $originalFileName = $this->sanitizeFileName($fileName);
+        $originalFilePath = $this->getFilePath($originalFileName);
         
-        // If title is provided and different from current filename, rename
-        if ($title && $title !== $this->getDisplayName($fileName)) {
+        // If title is provided and different from current filename, we need to rename
+        if ($title && $title !== $this->getDisplayName($originalFileName)) {
             $newFileName = $this->generateFileName($title);
-            $fileName = $newFileName;
+            $newFilePath = $this->getFilePath($newFileName);
+            
+            // Debug logging
+            error_log("FileManager: Renaming file from '$originalFileName' to '$newFileName'");
+            error_log("FileManager: Original path: '$originalFilePath'");
+            error_log("FileManager: New path: '$newFilePath'");
+            
+            // Safety check: make sure we're not creating an invalid filename
+            if (empty($newFileName) || $newFileName === '.md') {
+                error_log("FileManager: Generated filename is invalid, falling back to original");
+                $filePath = $originalFilePath;
+                $fileName = $originalFileName;
+            } elseif ($originalFilePath === $newFilePath) {
+                // Paths are the same, no need to rename
+                error_log("FileManager: Paths are identical, no rename needed");
+                $filePath = $originalFilePath;
+                $fileName = $originalFileName;
+            } elseif (file_exists($originalFilePath)) {
+                // Check if original file exists and we're renaming it
+                // Create backup of original file before renaming
+                $this->createBackup($originalFilePath);
+                
+                // Save content to new location
+                $result = file_put_contents($newFilePath, $content);
+                
+                if ($result === false) {
+                    throw new Exception("Failed to save file to new location: $newFileName");
+                }
+                
+                // Successfully saved to new location, now remove the original file
+                if (!unlink($originalFilePath)) {
+                    // If we can't delete the original, at least warn but don't fail
+                    error_log("Warning: Could not delete original file after rename: $originalFileName");
+                }
+                
+                return [
+                    'name' => $newFileName,
+                    'path' => $newFilePath,
+                    'size' => $result
+                ];
+            } else {
+                // Original file doesn't exist, just save with new name
+                $filePath = $newFilePath;
+                $fileName = $newFileName;
+            }
+        } else {
+            // No title change, just save to original location
+            $filePath = $originalFilePath;
+            $fileName = $originalFileName;
         }
-        
-        $filePath = $this->getFilePath($fileName);
         
         // Create backup if file exists
         if (file_exists($filePath)) {
@@ -146,8 +193,11 @@ class FileManager {
     }
     
     private function sanitizeFileName($fileName) {
-        // Remove or replace unsafe characters
-        $fileName = preg_replace('/[^a-zA-Z0-9\-_\.]/', '-', $fileName);
+        // Remove only truly unsafe filesystem characters, preserve international chars like åäö
+        $fileName = preg_replace('/[<>:"|*?\\/\\\\]/', '-', $fileName);
+        $fileName = preg_replace('/\s+/', '-', $fileName); // Replace spaces with dashes
+        $fileName = preg_replace('/-+/', '-', $fileName); // Remove multiple dashes
+        $fileName = trim($fileName, '-'); // Remove leading/trailing dashes
         
         // Ensure .md extension
         if (!preg_match('/\.md$/', $fileName)) {
@@ -158,11 +208,14 @@ class FileManager {
     }
     
     private function generateFileName($title) {
-        // Convert title to filename
-        $fileName = strtolower(trim($title));
-        $fileName = preg_replace('/[^a-zA-Z0-9\s\-_]/', '', $fileName);
-        $fileName = preg_replace('/\s+/', '-', $fileName);
-        $fileName = trim($fileName, '-');
+        // Convert title to filename, preserving international characters like åäö
+        $fileName = mb_strtolower(trim($title), 'UTF-8'); // Unicode-aware lowercase
+        
+        // Remove only truly unsafe filesystem characters, keep international chars
+        $fileName = preg_replace('/[<>:"|*?\\/\\\\]/', '-', $fileName);
+        $fileName = preg_replace('/\s+/', '-', $fileName); // Replace spaces with dashes
+        $fileName = preg_replace('/-+/', '-', $fileName); // Remove multiple dashes
+        $fileName = trim($fileName, '-'); // Remove leading/trailing dashes
         
         if (empty($fileName)) {
             $fileName = 'untitled-' . time();

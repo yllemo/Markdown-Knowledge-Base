@@ -60,8 +60,10 @@ $allTags = $tagManager->getAllTags();
                 <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
                 <button id="newFileBtn" class="btn btn-primary">+<span class="btn-text"> New File</span></button>
                 <button id="loadFileBtn" class="btn btn-secondary" title="Load .md file">📁<span class="btn-text"> Load</span></button>
+                <button id="exportBtn" class="btn btn-secondary" title="Export all files as ZIP">📤<span class="btn-text"> Export</span></button>
+                <button id="importBtn" class="btn btn-secondary" title="Import files from ZIP">📥<span class="btn-text"> Import</span></button>
                 <button id="settingsBtn" class="btn btn-secondary" title="Settings">⚙️</button>
-                <a href="logout.php" class="btn btn-danger" title="Logout">🚪</a>
+                <a href="logout.php" class="btn btn-logout" title="Logout">🚪</a>
             </div>
         </header>
 
@@ -80,7 +82,7 @@ $allTags = $tagManager->getAllTags();
                     </div>
                     <div id="fileList" class="file-list">
                         <?php 
-                        $displayFiles = array_slice($files, 0, 15); // Reduced limit
+                        $displayFiles = array_slice($files, 0, 15);
                         foreach ($displayFiles as $file): ?>
                             <div class="file-item" data-file="<?= htmlspecialchars($file['name']) ?>">
                                 <span class="file-name" title="<?= htmlspecialchars($file['display_name']) ?>"><?= htmlspecialchars($file['display_name']) ?></span>
@@ -98,7 +100,7 @@ $allTags = $tagManager->getAllTags();
                     </div>
                     <div id="tagList" class="tag-list">
                         <?php 
-                        $displayTags = array_slice($allTags, 0, 10, true); // Reduced limit
+                        $displayTags = array_slice($allTags, 0, 10, true);
                         foreach ($displayTags as $tag => $count): ?>
                             <div class="tag-item" data-tag="<?= htmlspecialchars($tag) ?>">
                                 <span class="tag-name" title="<?= htmlspecialchars($tag) ?>"><?= htmlspecialchars($tag) ?></span>
@@ -111,8 +113,13 @@ $allTags = $tagManager->getAllTags();
 
             <!-- Editor Area -->
             <div class="editor-container" id="editorContainer" style="display: none;">
+                <form autocomplete="off" onsubmit="return false;">
+                    <!-- Hidden input to prevent password manager triggers -->
+                    <input type="text" style="display:none;" autocomplete="off">
+                    <input type="password" style="display:none;" autocomplete="off">
+                </form>
                 <div class="editor-header">
-                    <input type="text" id="fileTitle" placeholder="File title..." class="title-input">
+                    <input type="text" id="fileTitle" placeholder="File title..." class="title-input" autocomplete="off" data-form-type="other">
                     <div class="editor-actions">
                         <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;">👁️ Preview</button>
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
@@ -124,7 +131,7 @@ $allTags = $tagManager->getAllTags();
                 
                 <div class="editor-meta">
                     <div class="tags-input-container">
-                        <input type="text" id="fileTags" placeholder="Tags (space or comma-separated)..." class="tags-input">
+                        <input type="text" id="fileTags" placeholder="Tags (space or comma-separated)..." class="tags-input" autocomplete="off" data-form-type="other">
                         <span class="tags-help" title="Type tags with spaces and they'll automatically be converted to comma-separated format">ⓘ</span>
                     </div>
                 </div>
@@ -132,7 +139,7 @@ $allTags = $tagManager->getAllTags();
                 <div class="editor-content">
                     <div class="editor-pane">
                         <h4>📝 Editor</h4>
-                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..."></textarea>
+                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..." spellcheck="false"></textarea>
                     </div>
                     <div class="preview-pane">
                         <h4 id="previewPaneHeader">👁️ Preview</h4>
@@ -292,6 +299,60 @@ $allTags = $tagManager->getAllTags();
     
     <!-- Hidden file input for loading .md files -->
     <input type="file" id="loadFileInput" accept=".md,.markdown" style="display: none;">
+    
+    <!-- Hidden file input for importing ZIP files -->
+    <input type="file" id="importFileInput" accept=".zip" style="display: none;">
+
+    <!-- Import Modal -->
+    <div id="importModal" class="settings-modal">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h2>Import Content</h2>
+                <button id="closeImportModal" class="close-modal">✕</button>
+            </div>
+            <div class="settings-body" id="importModalBody">
+                <div id="importStep1" class="import-step">
+                    <h3>Select ZIP File</h3>
+                    <p>Choose a ZIP file containing .md files to import into your knowledge base.</p>
+                    <button id="selectImportFile" class="btn btn-primary">📁 Select ZIP File</button>
+                </div>
+                
+                <div id="importStep2" class="import-step" style="display: none;">
+                    <h3>Review Import</h3>
+                    <div id="importSummary"></div>
+                    
+                    <div style="margin: 1rem 0; padding: 1rem; background-color: var(--bg-secondary); border-radius: 8px; border-left: 4px solid var(--warning);">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="removeAllFiles" style="margin: 0;">
+                            <strong>Remove all existing files before import</strong>
+                        </label>
+                        <p style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                            ⚠️ This will permanently delete ALL files in your content folder before importing the new ones.
+                        </p>
+                    </div>
+                    
+                    <div id="conflictList" style="display: none;">
+                        <h4>File Conflicts</h4>
+                        <p>The following files already exist. Select which ones to overwrite:</p>
+                        <div id="conflictFiles"></div>
+                        <label style="margin-top: 1rem;">
+                            <input type="checkbox" id="overwriteAll"> Overwrite all existing files
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="importStep3" class="import-step" style="display: none;">
+                    <h3>Import Complete</h3>
+                    <div id="importResults"></div>
+                </div>
+            </div>
+            <div class="settings-footer">
+                <button id="cancelImport" class="btn btn-secondary">Cancel</button>
+                <button id="confirmImport" class="btn btn-success" style="display: none;">Import Files</button>
+                <button id="finishImport" class="btn btn-primary" style="display: none;">Finish</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>

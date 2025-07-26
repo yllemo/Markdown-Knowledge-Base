@@ -75,12 +75,14 @@ class TagManager {
             $metadata = $this->extractMetadata($content);
             
             if (isset($metadata['tags']) && is_array($metadata['tags'])) {
-                $fileTags = array_map('strtolower', $metadata['tags']);
+                $fileTags = array_map(function($tag) {
+                    return mb_strtolower($tag, 'UTF-8');
+                }, $metadata['tags']);
                 
-                if (in_array(strtolower($targetTag), $fileTags)) {
+                if (in_array(mb_strtolower($targetTag, 'UTF-8'), $fileTags)) {
                     foreach ($metadata['tags'] as $tag) {
-                        $tagLower = strtolower($tag);
-                        if ($tagLower !== strtolower($targetTag)) {
+                        $tagLower = mb_strtolower($tag, 'UTF-8');
+                        if ($tagLower !== mb_strtolower($targetTag, 'UTF-8')) {
                             $relatedTags[$tag] = ($relatedTags[$tag] ?? 0) + 1;
                         }
                     }
@@ -115,8 +117,9 @@ class TagManager {
     
     public function suggestTags($content, $limit = 5) {
         // Extract keywords from content
-        $content = strtolower(strip_tags($content));
-        $content = preg_replace('/[^\w\s]/', ' ', $content);
+        $content = mb_strtolower(strip_tags($content), 'UTF-8');
+        // Keep international characters, only remove punctuation that's not part of words
+        $content = preg_replace('/[^\p{L}\p{N}\s\-_]/u', ' ', $content);
         
         // Get existing tags for reference
         $existingTags = array_keys($this->getAllTags());
@@ -124,20 +127,23 @@ class TagManager {
         
         // Check for existing tag matches in content
         foreach ($existingTags as $tag) {
-            if (strpos($content, strtolower($tag)) !== false) {
-                $suggestions[$tag] = substr_count($content, strtolower($tag));
+            if (mb_strpos($content, mb_strtolower($tag, 'UTF-8'), 0, 'UTF-8') !== false) {
+                $suggestions[$tag] = mb_substr_count($content, mb_strtolower($tag, 'UTF-8'), 'UTF-8');
             }
         }
         
         // Extract potential new tags (common words)
-        $words = str_word_count($content, 1);
+        // Split on whitespace and filter
+        $words = preg_split('/\s+/', $content, -1, PREG_SPLIT_NO_EMPTY);
         $wordFreq = array_count_values($words);
         
-        // Filter out common words
-        $stopWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'a', 'an'];
+        // Filter out common words (add Swedish common words)
+        $stopWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'a', 'an',
+                     // Swedish common words
+                     'och', 'att', 'det', 'en', 'av', 'är', 'för', 'på', 'med', 'som', 'till', 'har', 'de', 'från', 'var', 'den', 'kan', 'inte', 'om', 'han', 'hon', 'där', 'när', 'ska', 'eller', 'man', 'så', 'ett', 'nu', 'vid', 'också', 'än', 'här'];
         
         foreach ($wordFreq as $word => $freq) {
-            if (strlen($word) > 3 && !in_array($word, $stopWords) && $freq > 1) {
+            if (mb_strlen($word, 'UTF-8') > 3 && !in_array($word, $stopWords) && $freq > 1) {
                 if (!in_array($word, $existingTags)) {
                     $suggestions[$word] = $freq;
                 }
