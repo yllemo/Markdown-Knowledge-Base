@@ -5,6 +5,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # Dependency/vendor
 node_modules/
