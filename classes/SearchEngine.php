@@ -132,48 +132,54 @@ class SearchEngine {
             }
         }
         
-        // Regular term matching
+        // Regular term matching - only score if terms are found
+        $termMatchScore = 0;
         foreach ($parsedQuery['terms'] as $term) {
             $termLower = strtolower($term);
             
             if ($parsedQuery['title_only']) {
                 // Search only in title
                 if (strpos($titleLower, $termLower) !== false) {
-                    $score += 150;
+                    $termMatchScore += 150;
                 }
             } else {
                 // Title matches are highly weighted
                 $titleMatches = substr_count($titleLower, $termLower);
-                $score += $titleMatches * 100;
+                $termMatchScore += $titleMatches * 100;
                 
                 // Content matches
                 $contentMatches = substr_count($contentLower, $termLower);
-                $score += $contentMatches * 10;
+                $termMatchScore += $contentMatches * 10;
                 
                 // Bonus for word boundaries
                 if (preg_match('/\b' . preg_quote($termLower, '/') . '\b/', $contentLower)) {
-                    $score += 20;
+                    $termMatchScore += 20;
                 }
                 
                 // Bonus for matches in headings
                 if (preg_match('/^#{1,6}\s.*' . preg_quote($termLower, '/') . '/im', $content)) {
-                    $score += 30;
+                    $termMatchScore += 30;
                 }
                 
                 // Check metadata fields
                 if (isset($metadata['description']) && 
                     strpos(strtolower($metadata['description']), $termLower) !== false) {
-                    $score += 25;
+                    $termMatchScore += 25;
                 }
             }
         }
         
-        // Boost recent files slightly
-        $daysSinceModified = (time() - $file['modified']) / (24 * 60 * 60);
-        if ($daysSinceModified < 7) {
-            $score += 5;
-        } elseif ($daysSinceModified < 30) {
-            $score += 2;
+        // Only add to score if we found term matches
+        if ($termMatchScore > 0) {
+            $score += $termMatchScore;
+            
+            // Boost recent files slightly (only for files that match search terms)
+            $daysSinceModified = (time() - $file['modified']) / (24 * 60 * 60);
+            if ($daysSinceModified < 7) {
+                $score += 5;
+            } elseif ($daysSinceModified < 30) {
+                $score += 2;
+            }
         }
         
         return $score;

@@ -1,0 +1,2 @@
+# Keep this directory in git but ignore log files
+# Log files are generated at runtime and should not be committed

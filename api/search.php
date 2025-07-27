@@ -22,13 +22,22 @@ try {
     }
     
     $query = $_GET['q'];
-    $searchEngine = new SearchEngine('../content');
+    $contentPath = getCurrentContentPath();
+    $searchEngine = new SearchEngine($contentPath);
     
     // Check if it's a tag search
     if (preg_match('/^tag:(.+)$/', $query, $matches)) {
         $tag = trim($matches[1]);
-        $fileManager = new FileManager('../content');
-        $results = $fileManager->getFilesByTag($tag);
+        $exactMatch = false;
+        
+        // Check if user wants exact match (quoted tag)
+        if (preg_match('/^"(.+)"$/', $tag, $quotedMatches)) {
+            $tag = $quotedMatches[1];
+            $exactMatch = true;
+        }
+        
+        $fileManager = new FileManager($contentPath);
+        $results = $fileManager->getFilesByTag($tag, $exactMatch);
     } else {
         $results = $searchEngine->search($query);
     }

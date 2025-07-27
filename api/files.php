@@ -13,7 +13,8 @@ requireAuthentication();
 
 require_once '../classes/FileManager.php';
 
-$fileManager = new FileManager('../content');
+$contentPath = getCurrentContentPath();
+$fileManager = new FileManager($contentPath);
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
@@ -88,8 +89,9 @@ function handlePost() {
             $fileName = $input['file'];
             $content = $input['content'];
             $title = $input['title'] ?? null;
+            $knowledgebaseContext = $input['knowledgebase_context'] ?? null;
             
-            $result = $fileManager->saveFile($fileName, $content, $title);
+            $result = $fileManager->saveFile($fileName, $content, $title, $knowledgebaseContext);
             echo json_encode(['success' => true, 'file' => $result]);
             break;
             

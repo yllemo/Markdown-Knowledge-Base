@@ -11,6 +11,8 @@ requireAuthentication();
 
 require_once '../classes/FileManager.php';
 
+}
+
 try {
     $method = $_SERVER['REQUEST_METHOD'];
     
@@ -22,24 +24,78 @@ try {
         exit;
     }
 
-    $fileManager = new FileManager('../content');
-    $contentDir = '../content';
+    // Get current knowledgebase selection and determine export path
+    $currentKnowledgebase = getConfig('current_knowledgebase', '');
     
-    // Check if content directory exists and has files
-    if (!is_dir($contentDir)) {
+    
+    // Use consistent path handling
+    if (empty($currentKnowledgebase) || $currentKnowledgebase === 'root') {
+        $currentContentPath = '../content';
+    } else {
+        $currentContentPath = '../content/' . $currentKnowledgebase;
+    }
+    
+    $fileManager = new FileManager($currentContentPath);
+    
+    // Debug logging
+    
+    // Check if content directory exists
+    if (!is_dir($currentContentPath)) {
         header('Content-Type: application/json');
         http_response_code(404);
-        echo json_encode(['error' => 'Content directory not found']);
+        echo json_encode(['error' => 'Content directory not found: ' . $currentContentPath]);
         exit;
     }
     
-    $files = glob($contentDir . '/*.md');
+    // Get files based on current knowledgebase selection
+    $files = [];
+    $exportingAllKb = (empty($currentKnowledgebase) || $currentKnowledgebase === 'root');
+    
+    
+    if ($exportingAllKb) {
+        // Export all knowledgebases - get files from all subfolders
+        $files = getAllMarkdownFiles('../content');
+        
+        // If no files found with getAllMarkdownFiles, try manual approach
+        if (empty($files)) {
+            
+            // Try to get files directly
+            $manualFiles = [];
+            
+            // Root files
+            $rootFiles = glob('../content/*.md');
+            if ($rootFiles) {
+                $manualFiles = array_merge($manualFiles, $rootFiles);
+            }
+            
+            // Subdirectory files
+            $subdirs = glob('../content/*', GLOB_ONLYDIR);
+            
+            foreach ($subdirs as $subdir) {
+                $subFiles = glob($subdir . '/*.md');
+                if ($subFiles) {
+                    $manualFiles = array_merge($manualFiles, $subFiles);
+                }
+            }
+            
+            $files = $manualFiles;
+        }
+    } else {
+        // Export specific knowledgebase only
+        $files = glob($currentContentPath . '/*.md');
+    }
+    
     if (empty($files)) {
+        // Let's check what's actually in the directory
+        $allFilesInDir = glob($currentContentPath . '/*');
+        
         header('Content-Type: application/json');
         http_response_code(404);
-        echo json_encode(['error' => 'No markdown files found to export']);
+        echo json_encode(['error' => 'No markdown files found to export in ' . $currentContentPath]);
         exit;
     }
+    
+    // $exportingAllKb is already defined above
     
     // Create temporary zip file with date/time in filename
     $date = date('Y-m-d_H-i-s');
@@ -58,12 +114,20 @@ try {
         $safeSiteTitle = 'knowledge-base';
     }
     
-    $zipFilename = "{$safeSiteTitle}-export_{$date}.zip";
+    // Generate filename based on what's being exported
+    if ($exportingAllKb) {
+        $zipFilename = "{$safeSiteTitle}-all-knowledgebases_{$date}.zip";
+    } else {
+        $kbSafeName = preg_replace('/[<>:"|*?\\/\\\\]/', '-', $currentKnowledgebase);
+        $zipFilename = "{$safeSiteTitle}-{$kbSafeName}_{$date}.zip";
+    }
     $zipPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $zipFilename;
+    
     
     // Initialize zip archive
     $zip = new ZipArchive();
     $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    
     
     if ($result !== TRUE) {
         header('Content-Type: application/json');
@@ -76,24 +140,41 @@ try {
     $fileCount = 0;
     $fileList = []; // Keep track of files for index generation
     
+    
     foreach ($files as $file) {
-        $filename = basename($file);
+        
         if (file_exists($file) && is_readable($file)) {
             $fileContent = file_get_contents($file);
+            
             if ($fileContent !== false) {
-                $zip->addFromString($filename, $fileContent);
+                // Determine filename/path in zip
+                if ($exportingAllKb) {
+                    // For all knowledgebases export, preserve folder structure
+                    $relativePath = str_replace('../content/', '', $file);
+                    $filePathInZip = $relativePath;
+                } else {
+                    // For single knowledgebase export, use just filename
+                    $filePathInZip = basename($file);
+                }
+                
+                $zipResult = $zip->addFromString($filePathInZip, $fileContent);
                 $fileCount++;
                 
                 // Store file info for index
                 $fileList[] = [
-                    'filename' => $filename,
+                    'filename' => $filePathInZip,
+                    'filepath' => $file,
                     'size' => strlen($fileContent),
                     'modified' => filemtime($file),
-                    'title' => extractTitleFromContent($fileContent, $filename)
+                    'title' => extractTitleFromContent($fileContent, basename($file)),
+                    'knowledgebase' => $exportingAllKb ? getKnowledgebaseFromPath($file) : $currentKnowledgebase
                 ];
+            } else {
             }
+        } else {
         }
     }
+    
     
     // Create index.md file
     $indexContent = generateIndexMarkdown($fileList, $siteTitle);
@@ -104,12 +185,16 @@ try {
         'export_date' => date('Y-m-d H:i:s'),
         'file_count' => $fileCount,
         'source' => 'Knowledge Base System',
-        'version' => '1.0'
+        'version' => '1.0',
+        'knowledgebase' => $exportingAllKb ? 'all' : $currentKnowledgebase,
+        'export_type' => $exportingAllKb ? 'all_knowledgebases' : 'single_knowledgebase'
     ];
     $zip->addFromString('export_info.json', json_encode($metadata, JSON_PRETTY_PRINT));
     
+    
     // Close zip file
     $closeResult = $zip->close();
+    
     
     if (!$closeResult) {
         header('Content-Type: application/json');
@@ -119,10 +204,14 @@ try {
     }
     
     // Check if zip was created successfully
-    if (!file_exists($zipPath) || filesize($zipPath) == 0) {
+    $zipExists = file_exists($zipPath);
+    $zipSize = $zipExists ? filesize($zipPath) : 0;
+    
+    
+    if (!$zipExists || $zipSize == 0) {
         header('Content-Type: application/json');
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to create zip file or file is empty']);
+        echo json_encode(['error' => 'Failed to create zip file or file is empty. Size: ' . $zipSize . ' bytes']);
         exit;
     }
     
@@ -197,53 +286,109 @@ function generateIndexMarkdown($fileList, $siteTitle) {
     $totalFiles = count($fileList);
     $totalSize = array_sum(array_column($fileList, 'size'));
     
-    // Sort files alphabetically by title
-    usort($fileList, function($a, $b) {
-        return strcasecmp($a['title'], $b['title']);
-    });
-    
-    // Group files by first letter
-    $groupedFiles = [];
-    foreach ($fileList as $file) {
-        $firstLetter = mb_strtoupper(mb_substr($file['title'], 0, 1, 'UTF-8'), 'UTF-8');
-        if (!preg_match('/[A-ZÅÄÖ]/u', $firstLetter)) {
-            $firstLetter = '#'; // For numbers and symbols
-        }
-        $groupedFiles[$firstLetter][] = $file;
-    }
+    // Check if this is a multi-knowledgebase export
+    $knowledgebases = array_unique(array_column($fileList, 'knowledgebase'));
+    $isMultiKb = count($knowledgebases) > 1 || (count($knowledgebases) == 1 && in_array('root', $knowledgebases) && $totalFiles > 0);
     
     // Generate markdown content
     $markdown = "# {$siteTitle}\n\n";
     $markdown .= "## Knowledge Base Export\n\n";
     $markdown .= "This knowledge base was exported on **{$date}** at **{$time}**.\n\n";
-    $markdown .= "### 📊 Statistics\n\n";
-    $markdown .= "- **Total Files:** {$totalFiles}\n";
-    $markdown .= "- **Total Size:** " . formatBytes($totalSize) . "\n";
-    $markdown .= "- **Export Date:** {$date} {$time}\n\n";
     
-    $markdown .= "### 📚 About This Knowledge Base\n\n";
-    $markdown .= "This is a collection of markdown documents from the **{$siteTitle}** knowledge base system. ";
-    $markdown .= "Each file contains structured information and can be opened with any markdown editor or viewer.\n\n";
-    
-    $markdown .= "### 🗂️ File Organization\n\n";
-    $markdown .= "All files are organized alphabetically below. Click on any link to open the corresponding file.\n\n";
-    
-    $markdown .= "---\n\n";
-    $markdown .= "## 📋 File Index\n\n";
-    
-    // Generate alphabetical index
-    foreach ($groupedFiles as $letter => $files) {
-        $markdown .= "### {$letter}\n\n";
-        foreach ($files as $file) {
-            $title = $file['title'];
-            $filename = $file['filename'];
-            $size = formatBytes($file['size']);
-            $modified = date('Y-m-d', $file['modified']);
-            
-            $markdown .= "- **[{$title}]({$filename})** ";
-            $markdown .= "*({$size}, modified: {$modified})*\n";
+    if ($isMultiKb) {
+        $kbCount = count($knowledgebases);
+        $markdown .= "### 📊 Statistics\n\n";
+        $markdown .= "- **Total Files:** {$totalFiles}\n";
+        $markdown .= "- **Total Size:** " . formatBytes($totalSize) . "\n";
+        $markdown .= "- **Knowledge Bases:** {$kbCount}\n";
+        $markdown .= "- **Export Date:** {$date} {$time}\n\n";
+        
+        // Group files by knowledgebase
+        $kbGroups = [];
+        foreach ($fileList as $file) {
+            $kbGroups[$file['knowledgebase']][] = $file;
+        }
+        
+        $markdown .= "### 📚 Knowledge Bases Included\n\n";
+        foreach ($kbGroups as $kb => $files) {
+            $fileCount = count($files);
+            $kbSize = array_sum(array_column($files, 'size'));
+            $markdown .= "- **{$kb}**: {$fileCount} files (" . formatBytes($kbSize) . ")\n";
         }
         $markdown .= "\n";
+        
+        $markdown .= "### 🗂️ File Organization\n\n";
+        $markdown .= "Files are organized by knowledge base below. Each knowledge base contains its own collection of documents.\n\n";
+        
+        $markdown .= "---\n\n";
+        $markdown .= "## 📋 File Index by Knowledge Base\n\n";
+        
+        // Sort knowledgebases
+        ksort($kbGroups);
+        
+        foreach ($kbGroups as $kb => $files) {
+            $markdown .= "### 📁 {$kb}\n\n";
+            
+            // Sort files within KB alphabetically
+            usort($files, function($a, $b) {
+                return strcasecmp($a['title'], $b['title']);
+            });
+            
+            foreach ($files as $file) {
+                $title = $file['title'];
+                $filename = $file['filename'];
+                $size = formatBytes($file['size']);
+                $modified = date('Y-m-d', $file['modified']);
+                
+                $markdown .= "- **[{$title}]({$filename})** ";
+                $markdown .= "*({$size}, modified: {$modified})*\n";
+            }
+            $markdown .= "\n";
+        }
+    } else {
+        // Single knowledgebase export
+        $singleKb = $knowledgebases[0];
+        $markdown .= "### 📊 Statistics\n\n";
+        $markdown .= "- **Knowledge Base:** {$singleKb}\n";
+        $markdown .= "- **Total Files:** {$totalFiles}\n";
+        $markdown .= "- **Total Size:** " . formatBytes($totalSize) . "\n";
+        $markdown .= "- **Export Date:** {$date} {$time}\n\n";
+        
+        // Sort files alphabetically by title
+        usort($fileList, function($a, $b) {
+            return strcasecmp($a['title'], $b['title']);
+        });
+        
+        // Group files by first letter
+        $groupedFiles = [];
+        foreach ($fileList as $file) {
+            $firstLetter = mb_strtoupper(mb_substr($file['title'], 0, 1, 'UTF-8'), 'UTF-8');
+            if (!preg_match('/[A-ZÅÄÖ]/u', $firstLetter)) {
+                $firstLetter = '#'; // For numbers and symbols
+            }
+            $groupedFiles[$firstLetter][] = $file;
+        }
+        
+        $markdown .= "### 🗂️ File Organization\n\n";
+        $markdown .= "All files are organized alphabetically below. Click on any link to open the corresponding file.\n\n";
+        
+        $markdown .= "---\n\n";
+        $markdown .= "## 📋 File Index\n\n";
+        
+        // Generate alphabetical index
+        foreach ($groupedFiles as $letter => $files) {
+            $markdown .= "### {$letter}\n\n";
+            foreach ($files as $file) {
+                $title = $file['title'];
+                $filename = $file['filename'];
+                $size = formatBytes($file['size']);
+                $modified = date('Y-m-d', $file['modified']);
+                
+                $markdown .= "- **[{$title}]({$filename})** ";
+                $markdown .= "*({$size}, modified: {$modified})*\n";
+            }
+            $markdown .= "\n";
+        }
     }
     
     $markdown .= "---\n\n";
@@ -269,5 +414,44 @@ function formatBytes($size, $precision = 2) {
     $index = floor($base);
     
     return round(pow(1024, $base - $index), $precision) . ' ' . $units[$index];
+}
+
+function getAllMarkdownFiles($contentDir) {
+    $files = [];
+    
+    
+    // Get files from root content directory
+    $rootPattern = $contentDir . '/*.md';
+    $rootFiles = glob($rootPattern);
+    if ($rootFiles) {
+        $files = array_merge($files, $rootFiles);
+    }
+    
+    // Get files from all subdirectories (knowledgebases)
+    $subdirPattern = $contentDir . '/*';
+    $subdirs = glob($subdirPattern, GLOB_ONLYDIR);
+    
+    foreach ($subdirs as $subdir) {
+        $subPattern = $subdir . '/*.md';
+        $subFiles = glob($subPattern);
+        if ($subFiles) {
+            $files = array_merge($files, $subFiles);
+        }
+    }
+    
+    return $files;
+}
+
+function getKnowledgebaseFromPath($filepath) {
+    // Extract knowledgebase name from file path
+    // e.g., ../content/my-kb/file.md -> my-kb
+    $relativePath = str_replace('../content/', '', $filepath);
+    $pathParts = explode('/', $relativePath);
+    
+    if (count($pathParts) > 1) {
+        return $pathParts[0]; // First part is the knowledgebase name
+    }
+    
+    return 'root'; // Files in root content directory
 }
 ?>

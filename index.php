@@ -17,9 +17,10 @@ require_once 'classes/FileManager.php';
 require_once 'classes/SearchEngine.php';
 require_once 'classes/TagManager.php';
 
-$fileManager = new FileManager();
-$searchEngine = new SearchEngine();
-$tagManager = new TagManager();
+$contentPath = getCurrentContentPath();
+$fileManager = new FileManager($contentPath);
+$searchEngine = new SearchEngine($contentPath);
+$tagManager = new TagManager($contentPath);
 
 // Get all files and tags for initial load
 $files = $fileManager->getAllFiles();
@@ -113,13 +114,13 @@ $allTags = $tagManager->getAllTags();
 
             <!-- Editor Area -->
             <div class="editor-container" id="editorContainer" style="display: none;">
-                <form autocomplete="off" onsubmit="return false;">
-                    <!-- Hidden input to prevent password manager triggers -->
-                    <input type="text" style="display:none;" autocomplete="off">
-                    <input type="password" style="display:none;" autocomplete="off">
-                </form>
                 <div class="editor-header">
-                    <input type="text" id="fileTitle" placeholder="File title..." class="title-input" autocomplete="off" data-form-type="other">
+                    <input type="text" id="fileTitle" placeholder="File title..." class="title-input" 
+                           autocomplete="off" 
+                           data-form-type="other" 
+                           data-lpignore="true"
+                           data-1p-ignore="true"
+                           name="file_title_field">
                     <div class="editor-actions">
                         <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;">👁️ Preview</button>
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
@@ -131,7 +132,12 @@ $allTags = $tagManager->getAllTags();
                 
                 <div class="editor-meta">
                     <div class="tags-input-container">
-                        <input type="text" id="fileTags" placeholder="Tags (space or comma-separated)..." class="tags-input" autocomplete="off" data-form-type="other">
+                        <input type="text" id="fileTags" placeholder="Tags (space or comma-separated)..." class="tags-input" 
+                               autocomplete="off" 
+                               data-form-type="other" 
+                               data-lpignore="true"
+                               data-1p-ignore="true"
+                               name="file_tags_field">
                         <span class="tags-help" title="Type tags with spaces and they'll automatically be converted to comma-separated format">ⓘ</span>
                     </div>
                 </div>
@@ -139,7 +145,12 @@ $allTags = $tagManager->getAllTags();
                 <div class="editor-content">
                     <div class="editor-pane">
                         <h4>📝 Editor</h4>
-                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..." spellcheck="false"></textarea>
+                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..." 
+                                  spellcheck="false"
+                                  autocomplete="off"
+                                  data-lpignore="true"
+                                  data-1p-ignore="true"
+                                  name="markdown_content_field"></textarea>
                     </div>
                     <div class="preview-pane">
                         <h4 id="previewPaneHeader">👁️ Preview</h4>
@@ -194,7 +205,25 @@ $allTags = $tagManager->getAllTags();
                     <h3>General Settings</h3>
                     <div class="setting-group">
                         <label for="siteTitle">Site Title</label>
-                        <input type="text" id="siteTitle" placeholder="Enter site title...">
+                        <input type="text" id="siteTitle" placeholder="Enter site title..."
+                               autocomplete="off"
+                               data-lpignore="true"
+                               data-1p-ignore="true"
+                               name="site_title_field">
+                    </div>
+                    <div class="setting-group">
+                        <label for="currentKnowledgebase">Current Knowledge Base</label>
+                        <select id="currentKnowledgebase" class="form-select">
+                            <?php 
+                            $knowledgebases = getAvailableKnowledgebases();
+                            $currentKb = getConfig('current_knowledgebase', '');
+                            foreach ($knowledgebases as $value => $label): 
+                                $selected = ($currentKb === $value || (empty($currentKb) && $value === 'root')) ? 'selected' : '';
+                            ?>
+                                <option value="<?= htmlspecialchars($value) ?>" <?= $selected ?>><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small>Select which knowledge base to work with. 'All Knowledge Bases' shows all content.</small>
                     </div>
                     <div class="setting-group">
                         <label for="sessionTimeout">Session Timeout (minutes)</label>
@@ -314,6 +343,16 @@ $allTags = $tagManager->getAllTags();
                 <div id="importStep1" class="import-step">
                     <h3>Select ZIP File</h3>
                     <p>Choose a ZIP file containing .md files to import into your knowledge base.</p>
+                    <div class="setting-group">
+                        <label for="knowledgebaseName">Knowledge Base Name</label>
+                        <input type="text" id="knowledgebaseName" placeholder="Enter knowledge base name (optional)..." 
+                               class="form-input"
+                               autocomplete="off"
+                               data-lpignore="true"
+                               data-1p-ignore="true"
+                               name="knowledgebase_name_field">
+                        <small>If empty, the ZIP filename will be used. This will create a subfolder under /content/[name]</small>
+                    </div>
                     <button id="selectImportFile" class="btn btn-primary">📁 Select ZIP File</button>
                 </div>
                 

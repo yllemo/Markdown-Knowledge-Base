@@ -3,9 +3,12 @@
 class KnowledgeBase {
     constructor() {
         this.currentFile = '';
+        this.currentFileRelativePath = ''; // Track the full relative path for saving
+        this.currentFileKnowledgebase = ''; // Track which knowledgebase the file belongs to
         this.originalFileTitle = ''; // Track original title to detect changes
         this.unsavedChanges = false;
         this.searchTimeout = null;
+        this.isSearchActive = false;
         this.isScrollSyncing = false;
         this.fileDisplayLimit = 15;
         this.tagDisplayLimit = 10;
@@ -310,12 +313,21 @@ class KnowledgeBase {
     renderFileList(files) {
         const filesToShow = files.slice(0, this.fileDisplayLimit);
         
-        let html = filesToShow.map(file => `
-            <div class="file-item" data-file="${file.name}">
-                <span class="file-name" title="${file.display_name}">${file.display_name}</span>
-                <span class="file-date">${new Date(file.modified * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-            </div>
-        `).join('');
+        let html = filesToShow.map(file => {
+            const kbIndicator = file.knowledgebase && file.knowledgebase !== 'root' 
+                ? `<span class="kb-indicator" title="Knowledge Base: ${file.knowledgebase}">${file.knowledgebase}</span>` 
+                : '';
+            
+            return `
+                <div class="file-item" data-file="${file.relative_path || file.name}">
+                    <span class="file-name" title="${file.display_name}">${file.display_name}</span>
+                    <div class="file-meta">
+                        ${kbIndicator}
+                        <span class="file-date">${new Date(file.modified * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
         
         // Update the header with count
         const filesHeader = document.querySelector('.sidebar-section h3');
@@ -348,6 +360,11 @@ class KnowledgeBase {
 
     // Section view switchers
     showRecent(type) {
+        // Don't override search results
+        if (this.isSearchActive && type === 'files') {
+            return;
+        }
+        
         const buttons = document.querySelectorAll(`.sidebar-section .section-btn`);
         buttons.forEach(btn => btn.classList.remove('active'));
         
@@ -400,10 +417,15 @@ class KnowledgeBase {
         
         const html = files.map(file => {
             const metadata = this.getFileMetadata(file);
+            const kbIndicator = file.knowledgebase && file.knowledgebase !== 'root' 
+                ? `<span class="kb-indicator">${file.knowledgebase}</span>` 
+                : '';
+            
             return `
-                <div class="browse-item" data-file="${file.name}">
+                <div class="browse-item" data-file="${file.relative_path || file.name}">
                     <div class="browse-item-title">${file.display_name}</div>
                     <div class="browse-item-meta">
+                        ${kbIndicator}
                         <span>${new Date(file.modified * 1000).toLocaleDateString()}</span>
                         <span>${this.formatFileSize(file.size)}</span>
                     </div>
@@ -493,6 +515,7 @@ class KnowledgeBase {
             
             // Populate form fields
             document.getElementById('siteTitle').value = settings.site_title || '';
+            document.getElementById('currentKnowledgebase').value = settings.current_knowledgebase || 'root';
             document.getElementById('sessionTimeout').value = Math.floor((settings.session_timeout || 31536000) / 60);
             document.getElementById('sidebarWidth').value = settings.sidebar_width || 300;
             document.getElementById('editorFontSize').value = settings.editor_font_size || 14;
@@ -516,6 +539,7 @@ class KnowledgeBase {
         try {
             const settings = {
                 site_title: document.getElementById('siteTitle').value,
+                current_knowledgebase: document.getElementById('currentKnowledgebase').value,
                 session_timeout: parseInt(document.getElementById('sessionTimeout').value) * 60,
                 sidebar_width: parseInt(document.getElementById('sidebarWidth').value),
                 editor_font_size: parseInt(document.getElementById('editorFontSize').value),
@@ -729,6 +753,8 @@ class KnowledgeBase {
             if (pane.classList.contains('preview-pane') && previewPaneHeader) {
                 previewPaneHeader.textContent = '👁️ Preview';
             }
+            // Remove content wrapper for preview
+            this.unwrapPreviewContent();
         } else {
             // Enter fullscreen
             pane.classList.add('fullscreen');
@@ -741,11 +767,34 @@ class KnowledgeBase {
                 const title = this.fileTitle && this.fileTitle.value ? this.fileTitle.value.trim() : '';
                 previewPaneHeader.textContent = title || '👁️ Preview';
             }
+            // Wrap content for centered layout with edge scrollbar
+            if (pane.classList.contains('preview-pane')) {
+                this.wrapPreviewContent();
+            }
         }
         // Always restore sidebar/header if exiting fullscreen
         if (!document.querySelector('.editor-pane.fullscreen') && !document.querySelector('.preview-pane.fullscreen')) {
             if (header) header.style.display = '';
             body.classList.remove('fullscreen-mode');
+        }
+    }
+    
+    wrapPreviewContent() {
+        const preview = this.markdownPreview;
+        if (preview && !preview.querySelector('.markdown-preview-content')) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'markdown-preview-content';
+            wrapper.innerHTML = preview.innerHTML;
+            preview.innerHTML = '';
+            preview.appendChild(wrapper);
+        }
+    }
+    
+    unwrapPreviewContent() {
+        const preview = this.markdownPreview;
+        const wrapper = preview.querySelector('.markdown-preview-content');
+        if (wrapper) {
+            preview.innerHTML = wrapper.innerHTML;
         }
     }
 
@@ -843,14 +892,23 @@ class KnowledgeBase {
                 return;
             }
 
-            this.currentFile = fileName;
-            this.currentFileInput.value = fileName;
+            // Store file information for saving
+            this.currentFile = fileData.name || fileName; // Just the filename
+            this.currentFileRelativePath = fileData.relative_path || fileName; // Full relative path
+            this.currentFileInput.value = this.currentFileRelativePath;
+            
+            // Determine knowledgebase from the relative path
+            if (this.currentFileRelativePath.includes('/')) {
+                this.currentFileKnowledgebase = this.currentFileRelativePath.split('/')[0];
+            } else {
+                this.currentFileKnowledgebase = 'root';
+            }
             
             // Parse frontmatter
             const { content, metadata } = this.parseFrontmatter(fileData.content);
             
             // Update UI
-            this.fileTitle.value = metadata.title || this.getDisplayName(fileName);
+            this.fileTitle.value = metadata.title || this.getDisplayName(this.currentFile);
             this.originalFileTitle = this.fileTitle.value; // Store original title
             this.fileTags.value = (metadata.tags || []).join(', ');
             this.markdownEditor.value = content;
@@ -862,7 +920,7 @@ class KnowledgeBase {
             this.showEditor();
             
             // Update active file
-            this.updateActiveFile(fileName);
+            this.updateActiveFile(this.currentFileRelativePath);
             
             this.unsavedChanges = false;
             this.updateSaveButton();
@@ -882,6 +940,8 @@ class KnowledgeBase {
 
         const fileName = `note-${Date.now()}.md`;
         this.currentFile = fileName;
+        this.currentFileRelativePath = fileName; // New files start in current context
+        this.currentFileKnowledgebase = 'current'; // Will use current selected KB
         this.currentFileInput.value = fileName;
         
         this.fileTitle.value = 'New Note';
@@ -1048,11 +1108,21 @@ class KnowledgeBase {
 
         const fullContent = this.createFrontmatter(frontmatter) + '\n' + content;
 
-        // Only send title if it has actually changed
+        // Determine the file path for saving
+        let fileToSave = this.currentFileRelativePath || this.currentFile;
+        
+        // For new files or when knowledgebase is 'current', determine the correct path
+        if (this.currentFileKnowledgebase === 'current' || !this.currentFileRelativePath.includes('/')) {
+            // This is a new file or existing root file - save to current knowledgebase context
+            // We'll let the backend determine the correct location based on current settings
+            fileToSave = this.currentFile;
+        }
+
         const requestBody = {
             action: 'save',
-            file: this.currentFile,
-            content: fullContent
+            file: fileToSave,
+            content: fullContent,
+            knowledgebase_context: this.currentFileKnowledgebase
         };
 
         // Only include title if it has changed from the original
@@ -1076,6 +1146,13 @@ class KnowledgeBase {
                 return;
             }
 
+            // Update file tracking information after save
+            if (result.file && result.file.name) {
+                this.currentFile = result.file.name;
+                this.currentFileRelativePath = result.file.relative_path || result.file.name;
+                this.currentFileInput.value = this.currentFileRelativePath;
+            }
+
             this.unsavedChanges = false;
             this.updateSaveButton();
             
@@ -1087,7 +1164,7 @@ class KnowledgeBase {
             await this.refreshTagList();
             
             // Update active file
-            this.updateActiveFile(this.currentFile);
+            this.updateActiveFile(this.currentFileRelativePath);
             
             // Show success
             this.showNotification('File saved successfully!', 'success');
@@ -1167,9 +1244,19 @@ class KnowledgeBase {
         this.editorContainer.style.display = 'none';
         this.welcomeScreen.style.display = 'flex';
         this.currentFile = '';
+        this.currentFileRelativePath = '';
+        this.currentFileKnowledgebase = '';
         this.currentFileInput.value = '';
         this.unsavedChanges = false;
         this.updateActiveFile('');
+        
+        // Reset search box and refresh file list
+        if (this.searchInput) {
+            this.searchInput.value = '';
+            this.isSearchActive = false;
+            this.clearSearchUI();
+            this.refreshFileList();
+        }
     }
     
     goToWelcomeScreen() {
@@ -1346,6 +1433,9 @@ class KnowledgeBase {
         clearTimeout(this.searchTimeout);
         this.searchTimeout = setTimeout(async () => {
             if (query.trim() === '') {
+                // Clear search - reset to normal view
+                this.isSearchActive = false;
+                this.clearSearchUI();
                 await this.refreshFileList();
                 return;
             }
@@ -1353,6 +1443,10 @@ class KnowledgeBase {
             try {
                 const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
                 const results = await response.json();
+                
+                // Set search state and update UI
+                this.isSearchActive = true;
+                this.updateSearchUI();
                 this.renderFileList(results);
             } catch (error) {
                 console.error('Search error:', error);
@@ -1360,10 +1454,28 @@ class KnowledgeBase {
         }, 300);
     }
 
+    updateSearchUI() {
+        // Deactivate all section buttons when search is active
+        const buttons = document.querySelectorAll('.sidebar-section .section-btn');
+        buttons.forEach(btn => btn.classList.remove('active'));
+    }
+
+    clearSearchUI() {
+        // Reactivate the Recent button for files
+        const buttons = document.querySelectorAll('.sidebar-section .section-btn');
+        if (buttons.length > 0) {
+            buttons[0].classList.add('active'); // First button is usually "Recent" for files
+        }
+    }
+
     async filterByTag(tagName) {
         try {
             const response = await fetch(`api/files.php?tag=${encodeURIComponent(tagName)}`);
             const files = await response.json();
+            
+            // Set search state and update UI
+            this.isSearchActive = true;
+            this.updateSearchUI();
             this.renderFileList(files);
             
             // Update search input to show filter
@@ -1758,6 +1870,12 @@ class KnowledgeBase {
             this.importFileInput.value = '';
         }
         
+        // Clear knowledgebase name input
+        const knowledgebaseNameInput = document.getElementById('knowledgebaseName');
+        if (knowledgebaseNameInput) {
+            knowledgebaseNameInput.value = '';
+        }
+        
         // Reset stored session
         this.importSession = null;
     }
@@ -1815,9 +1933,13 @@ class KnowledgeBase {
         try {
             this.showNotification('Analyzing import file...', 'info');
             
+            const knowledgebaseName = document.getElementById('knowledgebaseName')?.value || '';
+            
+            // Try regular session-based import first
             const formData = new FormData();
             formData.append('zipFile', file);
             formData.append('action', 'upload');
+            formData.append('knowledgebase_name', knowledgebaseName);
             
             const response = await fetch('api/import.php', {
                 method: 'POST',
@@ -1827,7 +1949,10 @@ class KnowledgeBase {
             const result = await response.json();
             
             if (!result.success) {
-                throw new Error(result.error || 'Import analysis failed');
+                // If session-based import fails, try direct import for web servers
+                console.log('Session-based import failed, trying direct import...');
+                await this.tryDirectImport(file, knowledgebaseName);
+                return;
             }
             
             this.importSession = result;
@@ -1835,7 +1960,13 @@ class KnowledgeBase {
             
         } catch (error) {
             console.error('Import analysis error:', error);
-            this.showNotification(error.message || 'Import analysis failed', 'error');
+            // Try direct import as fallback
+            try {
+                const knowledgebaseName = document.getElementById('knowledgebaseName')?.value || '';
+                await this.tryDirectImport(file, knowledgebaseName);
+            } catch (fallbackError) {
+                this.showNotification(error.message || 'Import analysis failed', 'error');
+            }
         }
     }
 
@@ -1854,10 +1985,12 @@ class KnowledgeBase {
             <div class="import-summary">
                 <p><strong>Import Analysis:</strong></p>
                 <ul>
+                    <li>Knowledge Base: <strong>${analysisResult.knowledgebase_name}</strong></li>
                     <li>Total files found: ${analysisResult.total_files}</li>
                     <li>New files: ${analysisResult.new_count}</li>
                     <li>Conflicting files: ${analysisResult.conflict_count}</li>
                 </ul>
+                <p><small>Files will be imported to: <code>/content/${analysisResult.knowledgebase_name}/</code></small></p>
             </div>
         `;
         
@@ -1925,6 +2058,10 @@ class KnowledgeBase {
             console.log('Import debug - Remove all files:', removeAllFiles);
             console.log('Import debug - Import session data:', this.importSession);
             
+            if (!this.importSession || !this.importSession.session_id) {
+                throw new Error('No valid import session. Please try uploading the file again.');
+            }
+            
             const formData = new FormData();
             formData.append('action', 'confirm');
             formData.append('session_id', this.importSession.session_id);
@@ -1940,6 +2077,10 @@ class KnowledgeBase {
             const result = await response.json();
             
             if (!result.success) {
+                // If session error, provide more helpful message
+                if (result.error && result.error.includes('session')) {
+                    throw new Error('Import session expired. Please start over by selecting your ZIP file again.');
+                }
                 throw new Error(result.error || 'Import failed');
             }
             
@@ -1988,6 +2129,82 @@ class KnowledgeBase {
         document.getElementById('finishImport').style.display = 'inline-block';
         
         this.showNotification('Import completed successfully', 'success');
+    }
+
+    async tryDirectImport(file, knowledgebaseName) {
+        console.log('Attempting direct import for web server compatibility...');
+        this.showNotification('Using web server compatible import mode...', 'info');
+        
+        // Skip to direct import confirmation with simple options
+        this.showDirectImportDialog(file, knowledgebaseName);
+    }
+
+    showDirectImportDialog(file, knowledgebaseName) {
+        // Show simplified import dialog for direct import
+        document.getElementById('importStep1').style.display = 'none';
+        document.getElementById('importStep2').style.display = 'block';
+        
+        const summary = document.getElementById('importSummary');
+        summary.innerHTML = `
+            <div class="import-summary">
+                <p><strong>Direct Import Mode:</strong></p>
+                <p>Your web server has short session timeouts. Using direct import mode.</p>
+                <ul>
+                    <li>File: <strong>${file.name}</strong></li>
+                    <li>Knowledge Base: <strong>${knowledgebaseName || file.name.replace('.zip', '')}</strong></li>
+                    <li>Size: ${this.formatFileSize(file.size)}</li>
+                </ul>
+                <p><small>Files will be imported to: <code>/content/${knowledgebaseName || file.name.replace('.zip', '')}/</code></small></p>
+            </div>
+        `;
+        
+        // Hide conflict list for direct import
+        document.getElementById('conflictList').style.display = 'none';
+        
+        // Store file for direct import
+        this.directImportFile = file;
+        this.directImportKnowledgebase = knowledgebaseName;
+        
+        // Show confirm button
+        document.getElementById('confirmImport').style.display = 'inline-block';
+        
+        // Update confirm button to handle direct import
+        const confirmBtn = document.getElementById('confirmImport');
+        confirmBtn.onclick = () => this.confirmDirectImport();
+    }
+
+    async confirmDirectImport() {
+        try {
+            this.showNotification('Importing files directly...', 'info');
+            
+            const overwriteAll = document.getElementById('overwriteAll').checked;
+            const removeAllFiles = document.getElementById('removeAllFiles').checked;
+            
+            const formData = new FormData();
+            formData.append('zipFile', this.directImportFile);
+            formData.append('action', 'direct_import');
+            formData.append('knowledgebase_name', this.directImportKnowledgebase || '');
+            formData.append('overwrite_all', overwriteAll ? 'true' : 'false');
+            formData.append('remove_all_files', removeAllFiles ? 'true' : 'false');
+            
+            const response = await fetch('api/import.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Direct import failed');
+            }
+            
+            this.showImportStep3(result);
+            this.loadInitialData(); // Refresh file list
+            
+        } catch (error) {
+            console.error('Direct import error:', error);
+            this.showNotification(error.message || 'Direct import failed', 'error');
+        }
     }
 
 }

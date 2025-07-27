@@ -15,7 +15,8 @@ $config = [
     'editor_font_size' => 14, // pixels
     'backup_enabled' => true,
     'backup_interval' => 86400, // 24 hours in seconds
-    'max_backups' => 10
+    'max_backups' => 10,
+    'current_knowledgebase' => '', // Current working knowledgebase (empty = root/all)
 ];
 
 // Load custom config if exists
@@ -121,5 +122,38 @@ function logout() {
     setcookie('kb_auth', '', time() - 3600, '/');
     setcookie('kb_auth_time', '', time() - 3600, '/');
     return true;
+}
+
+// Get available knowledgebases
+function getAvailableKnowledgebases() {
+    $contentDir = __DIR__ . '/content';
+    $knowledgebases = ['root' => 'All Knowledge Bases']; // Root shows all
+    
+    if (!is_dir($contentDir)) {
+        return $knowledgebases;
+    }
+    
+    // Scan for subdirectories
+    $items = scandir($contentDir);
+    foreach ($items as $item) {
+        $path = $contentDir . '/' . $item;
+        if ($item !== '.' && $item !== '..' && is_dir($path)) {
+            $knowledgebases[$item] = ucfirst(str_replace(['-', '_'], ' ', $item));
+        }
+    }
+    
+    return $knowledgebases;
+}
+
+// Get current content directory path based on selected knowledgebase
+function getCurrentContentPath() {
+    $currentKb = getConfig('current_knowledgebase', '');
+    $basePath = __DIR__ . '/content';
+    
+    if (empty($currentKb) || $currentKb === 'root') {
+        return $basePath; // Root shows all content
+    }
+    
+    return $basePath . '/' . $currentKb;
 }
 ?> 

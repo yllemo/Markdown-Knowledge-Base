@@ -248,6 +248,7 @@ body {
     background: var(--text-muted);
 }
 
+
 .show-more-btn {
     margin: 0.5rem 1rem;
     padding: 0.5rem;
@@ -324,6 +325,34 @@ body {
 .file-item.active .file-date {
     background-color: rgba(255, 255, 255, 0.2);
     color: white;
+}
+
+.file-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.kb-indicator {
+    font-size: 0.65rem;
+    color: var(--accent-primary);
+    background-color: var(--accent-muted);
+    padding: 0.15rem 0.35rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Prevent password manager detection on content fields */
+input[data-lpignore="true"],
+input[data-1p-ignore="true"],
+textarea[data-lpignore="true"],
+textarea[data-1p-ignore="true"] {
+    background-image: none !important;
+    background-color: var(--bg-secondary) !important;
 }
 
 .hidden-item {
@@ -1538,49 +1567,70 @@ body {
 }
 
 .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
-    /* Optimal reading width for fullscreen preview */
-    max-width: 800px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 2rem 3rem;
-    font-size: 1.1em;
-    line-height: 1.7;
+    /* Take full viewport and handle scrolling at edge */
+    width: 100vw;
+    height: calc(100vh - 60px);
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
     background: var(--bg-primary);
     color: var(--text-primary);
     border: none;
     outline: none;
+    box-sizing: border-box;
+    font-size: 1.1em;
+    line-height: 1.7;
+}
+
+/* Create a centered content wrapper for fullscreen preview */
+.fullscreen-mode .preview-pane.fullscreen .markdown-preview {
+    display: flex;
+    justify-content: center;
+}
+
+.fullscreen-mode .preview-pane.fullscreen .markdown-preview-content {
+    max-width: 800px;
+    width: 100%;
+    padding: 2rem 3rem;
     box-sizing: border-box;
     min-height: 100vh;
 }
 
 /* Responsive reading width adjustments */
 @media (max-width: 1200px) {
-    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview-content {
         max-width: 700px;
         padding: 2rem 2.5rem;
     }
 }
 
 @media (max-width: 900px) {
-    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview-content {
         max-width: 600px;
         padding: 1.5rem 2rem;
+    }
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
         font-size: 1.05em;
     }
 }
 
 @media (max-width: 768px) {
-    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview-content {
         max-width: 100%;
         padding: 1rem 1.5rem;
+    }
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
         font-size: 1em;
         line-height: 1.6;
     }
 }
 
 @media (max-width: 480px) {
-    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview-content {
         padding: 1rem;
+    }
+    .fullscreen-mode .preview-pane.fullscreen .markdown-preview {
         font-size: 0.95em;
     }
 }

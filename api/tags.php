@@ -14,7 +14,8 @@ requireAuthentication();
 require_once '../classes/TagManager.php';
 
 try {
-    $tagManager = new TagManager('../content');
+    $contentPath = getCurrentContentPath();
+    $tagManager = new TagManager($contentPath);
     $tags = $tagManager->getAllTags();
     
     echo json_encode($tags);

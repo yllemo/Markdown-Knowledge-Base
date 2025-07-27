@@ -17,17 +17,29 @@ class FileManager {
     
     public function getAllFiles() {
         $files = [];
-        $pattern = $this->contentDir . '/*.md';
         
-        foreach (glob($pattern) as $filePath) {
-            $fileName = basename($filePath);
-            $files[] = [
-                'name' => $fileName,
-                'display_name' => $this->getDisplayName($fileName),
-                'path' => $filePath,
-                'modified' => filemtime($filePath),
-                'size' => filesize($filePath)
-            ];
+        // Check if we're using root (show all) or specific knowledgebase
+        $currentKb = getConfig('current_knowledgebase', '');
+        
+        if (empty($currentKb) || $currentKb === 'root') {
+            // Show files from all knowledgebases
+            $this->scanFilesRecursively($this->contentDir, $files);
+        } else {
+            // Show files from specific knowledgebase only
+            $pattern = $this->contentDir . '/*.md';
+            foreach (glob($pattern) as $filePath) {
+                $fileName = basename($filePath);
+                // For specific KB, relative path is just the filename since contentDir is already the KB folder
+                $files[] = [
+                    'name' => $fileName,
+                    'relative_path' => $fileName,
+                    'display_name' => $this->getDisplayName($fileName),
+                    'path' => $filePath,
+                    'modified' => filemtime($filePath),
+                    'size' => filesize($filePath),
+                    'knowledgebase' => $currentKb
+                ];
+            }
         }
         
         // Sort by modification time (newest first)
@@ -38,7 +50,43 @@ class FileManager {
         return $files;
     }
     
+    private function scanFilesRecursively($dir, &$files, $knowledgebaseName = '') {
+        if (!is_dir($dir)) {
+            return;
+        }
+        
+        // Get files in current directory
+        $pattern = $dir . '/*.md';
+        foreach (glob($pattern) as $filePath) {
+            $fileName = basename($filePath);
+            // Calculate relative path from base content directory
+            $relativePath = $knowledgebaseName ? $knowledgebaseName . '/' . $fileName : $fileName;
+            
+            $files[] = [
+                'name' => $fileName,
+                'relative_path' => $relativePath,
+                'display_name' => $this->getDisplayName($fileName),
+                'path' => $filePath,
+                'modified' => filemtime($filePath),
+                'size' => filesize($filePath),
+                'knowledgebase' => $knowledgebaseName ?: 'root'
+            ];
+        }
+        
+        // Scan subdirectories (knowledgebases)
+        if (empty($knowledgebaseName)) { // Only scan subdirs at root level
+            $items = scandir($dir);
+            foreach ($items as $item) {
+                $path = $dir . '/' . $item;
+                if ($item !== '.' && $item !== '..' && is_dir($path)) {
+                    $this->scanFilesRecursively($path, $files, $item);
+                }
+            }
+        }
+    }
+    
     public function getFile($fileName) {
+        // $fileName might be a relative path like "knowledgebase/file.md" or just "file.md"
         $filePath = $this->getFilePath($fileName);
         
         if (!file_exists($filePath)) {
@@ -48,22 +96,27 @@ class FileManager {
         $content = file_get_contents($filePath);
         
         return [
-            'name' => $fileName,
+            'name' => basename($fileName), // Just the filename
+            'relative_path' => $fileName,  // The full relative path
             'content' => $content,
             'modified' => filemtime($filePath),
             'size' => filesize($filePath)
         ];
     }
     
-    public function saveFile($fileName, $content, $title = null) {
-        // Sanitize filename
-        $originalFileName = $this->sanitizeFileName($fileName);
-        $originalFilePath = $this->getFilePath($originalFileName);
+    public function saveFile($fileName, $content, $title = null, $knowledgebaseContext = null) {
+        // Handle knowledgebase context for proper file placement
+        $targetContentDir = $this->determineTargetDirectory($fileName, $knowledgebaseContext);
+        
+        // Sanitize filename (get just the base filename if it's a path)
+        $baseFileName = basename($fileName);
+        $originalFileName = $this->sanitizeFileName($baseFileName);
+        $originalFilePath = $targetContentDir . '/' . $originalFileName;
         
         // If title is provided and different from current filename, we need to rename
         if ($title && $title !== $this->getDisplayName($originalFileName)) {
             $newFileName = $this->generateFileName($title);
-            $newFilePath = $this->getFilePath($newFileName);
+            $newFilePath = $targetContentDir . '/' . $newFileName;
             
             // Debug logging
             error_log("FileManager: Renaming file from '$originalFileName' to '$newFileName'");
@@ -98,8 +151,12 @@ class FileManager {
                     error_log("Warning: Could not delete original file after rename: $originalFileName");
                 }
                 
+                // Calculate relative path for the return
+                $relativePath = $this->calculateRelativePath($newFilePath);
+                
                 return [
                     'name' => $newFileName,
+                    'relative_path' => $relativePath,
                     'path' => $newFilePath,
                     'size' => $result
                 ];
@@ -125,8 +182,12 @@ class FileManager {
             throw new Exception("Failed to save file: $fileName");
         }
         
+        // Calculate relative path for the return
+        $relativePath = $this->calculateRelativePath($filePath);
+        
         return [
-            'name' => $fileName,
+            'name' => basename($fileName),
+            'relative_path' => $relativePath,
             'path' => $filePath,
             'size' => $result
         ];
@@ -172,20 +233,104 @@ class FileManager {
         return $results;
     }
     
-    public function getFilesByTag($tag) {
+    public function getFilesByTag($tag, $exactMatch = false) {
         $results = [];
         $files = $this->getAllFiles();
+        $tagLower = strtolower($tag);
         
         foreach ($files as $file) {
             $content = file_get_contents($file['path']);
             $metadata = $this->parseFrontmatter($content);
             
-            if (isset($metadata['tags']) && in_array($tag, $metadata['tags'])) {
-                $results[] = $file;
+            if (isset($metadata['tags'])) {
+                $hasMatch = false;
+                
+                if ($exactMatch) {
+                    // Exact match only (original behavior for quoted searches)
+                    foreach ($metadata['tags'] as $fileTag) {
+                        if (strtolower($fileTag) === $tagLower) {
+                            $hasMatch = true;
+                            break;
+                        }
+                    }
+                } else {
+                    // Partial matching (new default behavior for consistency with content search)
+                    foreach ($metadata['tags'] as $fileTag) {
+                        $fileTagLower = strtolower($fileTag);
+                        if (strpos($fileTagLower, $tagLower) !== false) {
+                            $hasMatch = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if ($hasMatch) {
+                    // Add relevance score for consistency with content search
+                    $file['relevance'] = $this->calculateTagRelevance($tag, $metadata['tags'], $exactMatch);
+                    $file['excerpt'] = $this->generateTagExcerpt($metadata['tags'], $tag);
+                    $file['highlights'] = [];
+                    $file['metadata'] = $metadata;
+                    $results[] = $file;
+                }
             }
         }
         
+        // Sort by relevance (exact matches first, then partial matches)
+        usort($results, function($a, $b) {
+            return $b['relevance'] - $a['relevance'];
+        });
+        
         return $results;
+    }
+    
+    private function calculateTagRelevance($searchTag, $fileTags, $exactMatch = false) {
+        $score = 0;
+        $searchTagLower = strtolower($searchTag);
+        
+        foreach ($fileTags as $fileTag) {
+            $fileTagLower = strtolower($fileTag);
+            
+            if ($exactMatch) {
+                // For exact match searches, only exact matches get score
+                if ($fileTagLower === $searchTagLower) {
+                    $score += 100;
+                }
+            } else {
+                // For partial searches, use graduated scoring
+                // Exact match gets highest score
+                if ($fileTagLower === $searchTagLower) {
+                    $score += 100;
+                }
+                // Starts with search term
+                elseif (strpos($fileTagLower, $searchTagLower) === 0) {
+                    $score += 80;
+                }
+                // Contains search term
+                elseif (strpos($fileTagLower, $searchTagLower) !== false) {
+                    $score += 60;
+                }
+            }
+        }
+        
+        return $score;
+    }
+    
+    private function generateTagExcerpt($fileTags, $searchTag) {
+        $matchingTags = [];
+        $searchTagLower = strtolower($searchTag);
+        
+        foreach ($fileTags as $fileTag) {
+            if (strpos(strtolower($fileTag), $searchTagLower) !== false) {
+                $matchingTags[] = $fileTag;
+            }
+        }
+        
+        if (count($matchingTags) > 3) {
+            $matchingTags = array_slice($matchingTags, 0, 3);
+            return 'Tags: ' . implode(', ', $matchingTags) . '...';
+        } else {
+            return 'Tags: ' . implode(', ', $matchingTags);
+        }
     }
     
     private function getFilePath($fileName) {
@@ -380,5 +525,44 @@ class FileManager {
             'tag_count' => count($tagCount),
             'most_used_tags' => array_slice($tagCount, 0, 5, true)
         ];
+    }
+    
+    private function determineTargetDirectory($fileName, $knowledgebaseContext) {
+        // If the filename already contains a path (like 'kb/file.md'), preserve the directory
+        if (strpos($fileName, '/') !== false) {
+            $pathParts = explode('/', $fileName);
+            $kbName = $pathParts[0];
+            $baseContentDir = dirname($this->contentDir);
+            return $baseContentDir . '/content/' . $kbName;
+        }
+        
+        // For new files or files without path context
+        if ($knowledgebaseContext === 'current' || $knowledgebaseContext === null) {
+            // Use the current content directory (already set by getCurrentContentPath)
+            return $this->contentDir;
+        }
+        
+        // If a specific knowledgebase is provided
+        if ($knowledgebaseContext && $knowledgebaseContext !== 'root') {
+            $baseContentDir = dirname($this->contentDir);
+            return $baseContentDir . '/content/' . $knowledgebaseContext;
+        }
+        
+        // Default to current content directory
+        return $this->contentDir;
+    }
+    
+    private function calculateRelativePath($fullPath) {
+        // Calculate relative path from the base content directory
+        $baseContentDir = dirname($this->contentDir) . '/content';
+        
+        // If the path starts with the base content dir, make it relative
+        if (strpos($fullPath, $baseContentDir) === 0) {
+            $relativePath = substr($fullPath, strlen($baseContentDir) + 1);
+            return $relativePath;
+        }
+        
+        // Fallback to just the filename
+        return basename($fullPath);
     }
 }

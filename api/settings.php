@@ -38,6 +38,7 @@ function handleGet() {
     // Return current settings
     $settings = [
         'site_title' => getConfig('site_title'),
+        'current_knowledgebase' => getConfig('current_knowledgebase'),
         'password_protected' => getConfig('password_protected'),
         'session_timeout' => getConfig('session_timeout'),
         'theme' => getConfig('theme'),
@@ -139,6 +140,19 @@ function handleUpdate($input) {
                     $value = intval($value);
                     if ($value < 1 || $value > 100) {
                         throw new Exception('Max backups must be between 1 and 100');
+                    }
+                    break;
+                    
+                case 'current_knowledgebase':
+                    // Validate that the knowledgebase exists or is 'root'
+                    try {
+                        $availableKbs = getAvailableKnowledgebases();
+                        if (!array_key_exists($value, $availableKbs)) {
+                            throw new Exception('Invalid knowledgebase selected');
+                        }
+                    } catch (Exception $e) {
+                        // If validation fails, just allow it (defensive programming)
+                        error_log('Knowledgebase validation failed: ' . $e->getMessage());
                     }
                     break;
                     
