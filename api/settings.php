@@ -103,8 +103,8 @@ function handleUpdate($input) {
                     
                 case 'session_timeout':
                     $value = intval($value);
-                    if ($value < 300 || $value > 86400) { // 5 minutes to 24 hours
-                        throw new Exception('Session timeout must be between 5 minutes and 24 hours');
+                    if ($value < 300 || $value > 31536000) { // 5 minutes to 1 year
+                        throw new Exception('Session timeout must be between 5 minutes and 1 year');
                     }
                     break;
                     
@@ -169,6 +169,12 @@ function handleUpdate($input) {
                 case 'password_protected':
                     $value = (bool) $value;
                     break;
+                    
+                default:
+                    // Log unknown settings but don't fail
+                    error_log("Unknown setting attempted to save: $key = " . var_export($value, true));
+                    throw new Exception("Unknown setting: $key");
+                    break;
             }
             
             if (saveConfig($key, $value)) {
@@ -178,7 +184,9 @@ function handleUpdate($input) {
             }
             
         } catch (Exception $e) {
-            $errors[] = $e->getMessage();
+            $errorMsg = "Setting '$key' failed: " . $e->getMessage();
+            $errors[] = $errorMsg;
+            error_log($errorMsg); // Log to PHP error log
             $success = false;
         }
     }

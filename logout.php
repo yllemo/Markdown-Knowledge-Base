@@ -3,10 +3,10 @@
 
 require_once 'config.php';
 
-// Logout the user
+// Logout the user - clear all authentication cookies
 logout();
 
-// Redirect to login page
-header('Location: login.php');
+// Always redirect to login page with logout confirmation
+header('Location: login.php?logged_out=1');
 exit;
 ?> 

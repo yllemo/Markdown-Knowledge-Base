@@ -58,7 +58,12 @@ $allTags = $tagManager->getAllTags();
                 </h1>
             </div>
             <div class="header-actions">
-                <input type="text" id="searchInput" placeholder="Search files..." class="search-input">
+                <input type="text" id="searchInput" placeholder="Search files..." class="search-input"
+                       autocomplete="off" 
+                       data-form-type="other" 
+                       data-lpignore="true"
+                       data-1p-ignore="true"
+                       name="search_input_field">
                 <button id="newFileBtn" class="btn btn-primary">+<span class="btn-text"> New File</span></button>
                 <button id="loadFileBtn" class="btn btn-secondary" title="Load .md file">📁<span class="btn-text"> Load</span></button>
                 <button id="exportBtn" class="btn btn-secondary" title="Export all files as ZIP">📤<span class="btn-text"> Export</span></button>
@@ -186,7 +191,12 @@ $allTags = $tagManager->getAllTags();
                 <h2 id="browseTitle">Browse All Files</h2>
                 <button class="close-modal" onclick="window.kb.closeBrowseModal()">✕</button>
             </div>
-            <input type="text" id="browseSearch" class="browse-search" placeholder="Search...">
+            <input type="text" id="browseSearch" class="browse-search" placeholder="Search..."
+                   autocomplete="off" 
+                   data-form-type="other" 
+                   data-lpignore="true"
+                   data-1p-ignore="true"
+                   name="browse_search_field">
             <div id="browseList" class="browse-list">
                 <!-- Content will be populated by JavaScript -->
             </div>
@@ -227,7 +237,7 @@ $allTags = $tagManager->getAllTags();
                     </div>
                     <div class="setting-group">
                         <label for="sessionTimeout">Session Timeout (minutes)</label>
-                        <input type="number" id="sessionTimeout" min="5" max="1440" step="5">
+                        <input type="number" id="sessionTimeout" min="5" max="525600" step="5">
                     </div>
                     <div class="setting-group">
                         <label for="sidebarWidth">Sidebar Width (pixels)</label>

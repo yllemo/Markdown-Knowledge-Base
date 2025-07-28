@@ -194,7 +194,29 @@ class FileManager {
     }
     
     public function deleteFile($fileName) {
+        // Debug logging
+        error_log("FileManager::deleteFile called with: " . $fileName);
+        
+        // Security: Prevent directory traversal
+        if (strpos($fileName, '..') !== false || strpos($fileName, '\\') !== false) {
+            throw new Exception("Invalid file path: $fileName");
+        }
+        
         $filePath = $this->getFilePath($fileName);
+        error_log("Resolved file path: " . $filePath);
+        
+        // Security: Ensure the resolved path is within content directory
+        $realContentDir = realpath($this->contentDir);
+        if (!$realContentDir) {
+            throw new Exception("Cannot resolve content directory path");
+        }
+        
+        // For security check, use the directory of the file path
+        $fileDir = dirname($filePath);
+        $realFileDir = realpath($fileDir);
+        if ($realFileDir && strpos($realFileDir, $realContentDir) !== 0) {
+            throw new Exception("File path outside content directory: $fileName");
+        }
         
         if (!file_exists($filePath)) {
             throw new Exception("File not found: $fileName");

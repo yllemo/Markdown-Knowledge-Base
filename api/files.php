@@ -1,6 +1,9 @@
 <?php
 // api/files.php - API endpoint for file operations
 
+// Ensure clean output for JSON
+ob_start();
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
@@ -11,10 +14,25 @@ require_once '../config.php';
 // Check authentication
 requireAuthentication();
 
-require_once '../classes/FileManager.php';
-
-$contentPath = getCurrentContentPath();
-$fileManager = new FileManager($contentPath);
+try {
+    require_once '../classes/FileManager.php';
+    
+    $contentPath = getCurrentContentPath();
+    if (!$contentPath) {
+        throw new Exception("Could not determine content path");
+    }
+    
+    $fileManager = new FileManager($contentPath);
+    if (!$fileManager) {
+        throw new Exception("Could not create FileManager instance");
+    }
+    
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['error' => 'Initialization error: ' . $e->getMessage()]);
+    exit;
+}
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];
@@ -39,8 +57,15 @@ try {
     }
     
 } catch (Exception $e) {
+    // Clear any output that might have been generated
+    ob_clean();
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
+} catch (Error $e) {
+    // Catch fatal errors too
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['error' => 'PHP Error: ' . $e->getMessage()]);
 }
 
 function handleGet() {
@@ -103,18 +128,33 @@ function handlePost() {
 }
 
 function handleDelete() {
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (!$input || !isset($input['file'])) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing file name']);
-        return;
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        if (!$input || !isset($input['file'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing file name']);
+            return;
+        }
+        
+        global $fileManager, $contentPath;
+        $fileName = $input['file'];
+        
+        // Debug logging
+        error_log("Delete request for file: " . $fileName);
+        error_log("Content path: " . $contentPath);
+        
+        $fileManager->deleteFile($fileName);
+        echo json_encode(['success' => true]);
+        
+    } catch (Exception $e) {
+        error_log("Delete failed: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    } catch (Error $e) {
+        error_log("Delete PHP Error: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['error' => 'PHP Error: ' . $e->getMessage()]);
     }
-    
-    global $fileManager;
-    $fileName = $input['file'];
-    
-    $fileManager->deleteFile($fileName);
-    echo json_encode(['success' => true]);
 }
 ?>

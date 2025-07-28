@@ -6,10 +6,22 @@ ob_start();
 
 require_once 'config.php';
 
-// Check if setup is needed
-if (!getConfig('password_protected') || empty(getConfig('password'))) {
+// Check if setup is needed - only if password protection is enabled but no password is set
+if (getConfig('password_protected') && empty(getConfig('password'))) {
     header('Location: setup.php');
     exit;
+}
+
+// Handle logout confirmation
+if (isset($_GET['logged_out'])) {
+    $show_logout_message = true;
+    // Don't redirect - show login page with logout confirmation
+} else {
+    // If password protection is disabled and not a logout, redirect to main app
+    if (!getConfig('password_protected')) {
+        header('Location: index.php');
+        exit;
+    }
 }
 
 // Check if already logged in
@@ -174,6 +186,18 @@ $site_title = getConfig('site_title', 'Knowledge Base');
                 <div class="error-message"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
             
+            <?php if (isset($show_logout_message) && $show_logout_message): ?>
+                <div class="debug-info">
+                    <strong>✅ You have been logged out successfully</strong><br>
+                    <?php if (getConfig('password_protected')): ?>
+                        <p>Please enter your password to log back in.</p>
+                    <?php else: ?>
+                        <p>Since password protection is disabled, you can <a href="index.php">return to the knowledge base</a> without entering a password.</p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (getConfig('password_protected')): ?>
             <form class="login-form" method="POST">
                 <div class="form-group">
                     <label for="password">Password</label>
@@ -182,6 +206,7 @@ $site_title = getConfig('site_title', 'Knowledge Base');
                 
                 <button type="submit" class="login-btn">🔓 Login</button>
             </form>
+            <?php endif; ?>
             
             <div class="login-footer">
                 <p>Secure cookie-based authentication</p>

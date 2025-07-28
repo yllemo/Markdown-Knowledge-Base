@@ -41,22 +41,44 @@ function saveConfig($key, $value) {
     $custom_config_file = __DIR__ . '/config.custom.php';
     $custom_config = "<?php\nreturn " . var_export($config, true) . ";\n";
     
-    // Ensure no whitespace or output issues
-    $result = file_put_contents($custom_config_file, $custom_config);
-    
     // Clear any output buffers to prevent header issues
     if (ob_get_level()) {
         ob_clean();
     }
     
-    return $result;
+    // Ensure directory exists and is writable
+    $dir = dirname($custom_config_file);
+    if (!is_writable($dir)) {
+        error_log("Config directory not writable: $dir");
+        return false;
+    }
+    
+    // Write the file with proper error handling
+    $result = file_put_contents($custom_config_file, $custom_config, LOCK_EX);
+    if ($result === false) {
+        error_log("Failed to write config file: $custom_config_file");
+        return false;
+    }
+    
+    // Verify file was written correctly
+    if (!file_exists($custom_config_file)) {
+        error_log("Config file was not created: $custom_config_file");
+        return false;
+    }
+    
+    return $result !== false;
 }
 
 // Simple cookie-based authentication functions
 function isAuthenticated() {
-    // Check if password protection is enabled AND password is set
-    if (!getConfig('password_protected') || empty(getConfig('password'))) {
-        return true; // No password protection or no password set
+    // If password protection is disabled, allow access
+    if (!getConfig('password_protected')) {
+        return true; // Password protection is disabled
+    }
+    
+    // Password protection is enabled, check if password is set
+    if (empty(getConfig('password'))) {
+        return true; // No password set yet, allow access (setup needed)
     }
     
     // Check for authentication cookie
@@ -94,14 +116,19 @@ function requireAuthentication() {
 function login($password) {
     $stored_password = getConfig('password');
     
-    // Check if password protection is enabled
-    if (!getConfig('password_protected') || empty($stored_password)) {
+    // If password protection is disabled, allow access
+    if (!getConfig('password_protected')) {
         // Set simple authentication cookies
         $auth_time = time();
         $auth_token = hash('sha256', 'no_password' . $auth_time);
         setcookie('kb_auth', $auth_token, time() + getConfig('session_timeout', 3600), '/');
         setcookie('kb_auth_time', $auth_time, time() + getConfig('session_timeout', 3600), '/');
         return true;
+    }
+    
+    // Password protection is enabled but no password is set
+    if (empty($stored_password)) {
+        return false; // Should go to setup instead
     }
     
     // Verify password (support both hashed and plain text passwords)

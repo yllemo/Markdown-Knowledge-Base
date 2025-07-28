@@ -537,17 +537,23 @@ class KnowledgeBase {
 
     async saveSettings() {
         try {
+            // Helper function to parse integer with fallback
+            const parseIntSafe = (value, fallback) => {
+                const parsed = parseInt(value);
+                return isNaN(parsed) ? fallback : parsed;
+            };
+            
             const settings = {
-                site_title: document.getElementById('siteTitle').value,
-                current_knowledgebase: document.getElementById('currentKnowledgebase').value,
-                session_timeout: parseInt(document.getElementById('sessionTimeout').value) * 60,
-                sidebar_width: parseInt(document.getElementById('sidebarWidth').value),
-                editor_font_size: parseInt(document.getElementById('editorFontSize').value),
-                auto_save_interval: parseInt(document.getElementById('autoSaveInterval').value) * 1000,
+                site_title: document.getElementById('siteTitle').value || 'Knowledge Base',
+                current_knowledgebase: document.getElementById('currentKnowledgebase').value || '',
+                session_timeout: parseIntSafe(document.getElementById('sessionTimeout').value, 60) * 60,
+                sidebar_width: parseIntSafe(document.getElementById('sidebarWidth').value, 300),
+                editor_font_size: parseIntSafe(document.getElementById('editorFontSize').value, 14),
+                auto_save_interval: parseIntSafe(document.getElementById('autoSaveInterval').value, 30) * 1000,
                 password_protected: document.getElementById('passwordProtected').checked,
                 backup_enabled: document.getElementById('backupEnabled').checked,
-                backup_interval: parseInt(document.getElementById('backupInterval').value) * 3600,
-                max_backups: parseInt(document.getElementById('maxBackups').value)
+                backup_interval: parseIntSafe(document.getElementById('backupInterval').value, 24) * 3600,
+                max_backups: parseIntSafe(document.getElementById('maxBackups').value, 10)
             };
 
             const response = await fetch('api/settings.php', {
@@ -571,7 +577,13 @@ class KnowledgeBase {
                     window.location.reload();
                 }, 1000);
             } else {
-                this.showNotification(result.error || 'Error saving settings', 'error');
+                // Show detailed error message if available
+                let errorMsg = result.error || 'Error saving settings';
+                if (result.details && result.details.length > 0) {
+                    errorMsg += ':\n• ' + result.details.join('\n• ');
+                }
+                this.showNotification(errorMsg, 'error');
+                console.error('Settings errors:', result.details);
             }
             
         } catch (error) {
@@ -1189,14 +1201,15 @@ class KnowledgeBase {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    file: this.currentFile
+                    file: this.currentFileRelativePath || this.currentFile
                 })
             });
 
             const result = await response.json();
             
             if (result.error) {
-                alert('Error deleting file: ' + result.error);
+                console.error('Delete API error:', result.error);
+                this.showNotification('Error deleting file: ' + result.error, 'error');
                 return;
             }
 
@@ -1209,7 +1222,7 @@ class KnowledgeBase {
             
         } catch (error) {
             console.error('Error deleting file:', error);
-            alert('Error deleting file');
+            this.showNotification('Error deleting file: ' + error.message, 'error');
         }
     }
 
@@ -1222,8 +1235,9 @@ class KnowledgeBase {
 
         // Create a temporary link element to trigger the download
         const link = document.createElement('a');
-        link.href = `api/download.php?file=${encodeURIComponent(this.currentFile)}`;
-        link.download = this.currentFile; // Force the filename
+        const fileToDownload = this.currentFileRelativePath || this.currentFile;
+        link.href = `api/download.php?file=${encodeURIComponent(fileToDownload)}`;
+        link.download = this.currentFile; // Force the filename (just the name, not path)
         link.style.display = 'none';
         
         // Add to DOM, click, and remove
@@ -1804,8 +1818,17 @@ class KnowledgeBase {
             const contentType = response.headers.get('content-type');
             
             if (!response.ok || contentType?.includes('application/json')) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Export failed');
+                const text = await response.text();
+                if (text.trim() === '') {
+                    throw new Error('Export failed with empty response (status: ' + response.status + ')');
+                }
+                try {
+                    const errorData = JSON.parse(text);
+                    throw new Error(errorData.error || 'Export failed');
+                } catch (jsonError) {
+                    // If JSON parsing fails, show the raw response
+                    throw new Error('Export failed with invalid response: ' + text.substring(0, 200));
+                }
             }
             
             // Create download
