@@ -119,7 +119,8 @@ function listRootFiles($dir, $base) {
             $safePath = htmlspecialchars($path);
             $encodedRelPath = htmlspecialchars($relPath, ENT_QUOTES);
             $name = htmlspecialchars($item);
-            $result .= "<div class='file'><span>📄</span> $name
+            $viewUrl = "../view/?file=" . urlencode($relPath) . "&style=dark";
+            $result .= "<div class='file'><span>📄</span> <a href=\"$viewUrl\" target=\"_blank\" style=\"color:#fff;\">$name</a>
                 <button onclick=\"editFile('$encodedRelPath')\">Edit</button>
                 <button onclick=\"renameFile('$encodedRelPath')\">Rename</button>
                 <form method='POST' style='display:inline' onsubmit='return confirm(\"Delete file?\")'>
