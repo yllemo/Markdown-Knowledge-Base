@@ -46,6 +46,12 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 - Browse and filter by tags or files
 - Dark and light themes
 - Custom favicon and header icon support
+- **Advanced Markdown Support:**
+  - Syntax highlighting with Prism.js (supports 200+ languages)
+  - Mermaid diagrams and flowcharts
+  - Interactive checkboxes from markdown task lists
+  - SVG image inversion for dark/light mode compatibility
+- **Standalone Markdown Viewer** - Direct viewing of .md files with themes
 
 ## Quick Start
 
@@ -104,6 +110,47 @@ For production environments:
 - **Load existing .md files**: Click the "📁 Load" button to import .md files from your local storage
 - Use the sidebar or search to find notes.
 - Click the Files/Tags headers or stats to browse all.
+
+### Advanced Markdown Features
+
+#### Syntax Highlighting
+MDKB automatically highlights code blocks for 200+ programming languages using Prism.js:
+
+```javascript
+function hello() {
+    console.log("Hello, World!");
+}
+```
+
+#### Mermaid Diagrams
+Create flowcharts, sequence diagrams, and more using Mermaid syntax:
+
+```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+```
+
+#### Interactive Checkboxes
+Transform markdown task lists into interactive checkboxes:
+
+```markdown
+- [x] Completed task
+- [ ] Pending task
+- [ ] Another task
+```
+
+#### SVG Image Inversion
+Make SVG images adapt to dark/light themes by specifying their base color:
+
+```markdown
+![Logo](logo.svg "invert:white")  # White/light SVGs - inverts in dark mode
+![Icon](icon.svg "invert:black")  # Black/dark SVGs - inverts in light mode
+```
+
+#### Standalone Viewer
+View any markdown file directly with: `/view/?file=filename.md&style=dark` or `&style=light`
 
 ## Configuration
 - All settings are in `config.php` (or override in `config.custom.php`).

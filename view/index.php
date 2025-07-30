@@ -53,6 +53,30 @@ $html = preg_replace_callback(
     $html
 );
 
+// Process SVG images with inversion hints
+$html = preg_replace_callback(
+    '/<img([^>]*?)src="([^"]*\.svg)"([^>]*?)title="invert:(white|black)"([^>]*?)>/i',
+    function ($matches) {
+        $beforeSrc = $matches[1];
+        $src = $matches[2];
+        $afterSrc = $matches[3];
+        $invertType = strtolower($matches[4]);
+        $afterTitle = $matches[5];
+        
+        $class = 'svg-invertible svg-invert-' . $invertType;
+        if (strpos($beforeSrc . $afterSrc . $afterTitle, 'class=') !== false) {
+            // Add to existing class
+            $combined = $beforeSrc . $afterSrc . $afterTitle;
+            $combined = preg_replace('/class="([^"]*)"/', 'class="$1 ' . $class . '"', $combined);
+            return '<img' . $combined . 'src="' . $src . '">';
+        } else {
+            // Add new class attribute
+            return '<img' . $beforeSrc . 'src="' . $src . '" class="' . $class . '"' . $afterSrc . $afterTitle . '>';
+        }
+    },
+    $html
+);
+
 $title = htmlspecialchars(pathinfo(basename($filename), PATHINFO_FILENAME));
 $darkClass = $style === 'dark' ? 'dark' : 'light';
 ?>
@@ -157,6 +181,21 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
     margin-right: 0.4em;
     accent-color: #66aaff; /* Makes it nice in dark mode */
 }
+
+        /* SVG inversion for dark/light mode */
+        .svg-invertible {
+            transition: filter 0.3s ease;
+        }
+        
+        /* For SVGs that start as white - invert in dark mode */
+        body.dark .svg-invertible.svg-invert-white {
+            filter: invert(1);
+        }
+        
+        /* For SVGs that start as black - invert in light mode */
+        body.light .svg-invertible.svg-invert-black {
+            filter: invert(1);
+        }
 
     </style>
 </head>
