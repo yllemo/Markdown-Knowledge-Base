@@ -181,6 +181,7 @@ $allTags = $tagManager->getAllTags();
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
                         <button id="deleteBtn" class="btn btn-danger">🗑️ Delete</button>
                         <button id="downloadBtn" class="btn btn-primary">⬇️ Download</button>
+                        <button id="viewBtn" class="btn btn-primary">👁️ View</button>
                         <button id="closeBtn" class="btn btn-secondary">✕ Close</button>
                     </div>
                 </div>

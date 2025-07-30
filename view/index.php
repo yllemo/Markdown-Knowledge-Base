@@ -1,15 +1,23 @@
 <?php
 // index.php - Markdown Viewer
 
-$filename = isset($_GET['file']) ? basename($_GET['file']) : '';
+$filename = isset($_GET['file']) ? $_GET['file'] : '';
 $style = isset($_GET['style']) ? strtolower($_GET['style']) : 'light';
 
 if (!$filename || !preg_match('/\.md$/i', $filename)) {
     die('Invalid file parameter. Must be a .md file.');
 }
 
-$filePath = realpath(__DIR__ . '/../content/' . $filename);
-if (!$filePath || !file_exists($filePath)) {
+// Security check: prevent directory traversal attacks
+if (strpos($filename, '..') !== false || strpos($filename, '\\') !== false) {
+    die('Invalid file path.');
+}
+
+$contentDir = realpath(__DIR__ . '/../content');
+$filePath = realpath($contentDir . '/' . $filename);
+
+// Ensure the file is within the content directory and exists
+if (!$filePath || !file_exists($filePath) || strpos($filePath, $contentDir) !== 0) {
     die('File not found.');
 }
 
@@ -45,7 +53,7 @@ $html = preg_replace_callback(
     $html
 );
 
-$title = htmlspecialchars(pathinfo($filename, PATHINFO_FILENAME));
+$title = htmlspecialchars(pathinfo(basename($filename), PATHINFO_FILENAME));
 $darkClass = $style === 'dark' ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>

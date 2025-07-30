@@ -66,6 +66,7 @@ class KnowledgeBase {
         this.saveBtn = document.getElementById('saveBtn');
         this.deleteBtn = document.getElementById('deleteBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
+        this.viewBtn = document.getElementById('viewBtn');
         this.closeBtn = document.getElementById('closeBtn');
         
         // Export/Import elements
@@ -95,6 +96,7 @@ class KnowledgeBase {
             e.preventDefault();
             this.downloadFile();
         });
+        this.viewBtn.addEventListener('click', () => this.viewFile());
         this.closeBtn.addEventListener('click', () => this.closeEditor());
         
         // Settings operations
@@ -960,7 +962,7 @@ class KnowledgeBase {
         }
 
         const templateData = this.getTemplate(template);
-        const fileName = `${templateData.filename}-${Date.now()}.md`;
+        const fileName = `${templateData.filename}.md`;
         
         this.currentFile = fileName;
         this.currentFileRelativePath = fileName; // New files start in current context
@@ -1083,7 +1085,7 @@ Any additional tips or considerations.`
             },
             diary: {
                 title: today,
-                filename: `diary-${today}`,
+                filename: today,
                 tags: 'diary, journal, personal',
                 content: `# ${today}
 
@@ -1425,11 +1427,12 @@ Record how well the prompt works:
 
         try {
             const response = await fetch('api/files.php', {
-                method: 'DELETE',
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
+                    action: 'delete',
                     file: fileToDelete
                 })
             });
@@ -1483,6 +1486,20 @@ Record how well the prompt works:
         document.body.removeChild(link);
         
         this.showNotification('Download started!', 'success');
+    }
+
+    viewFile() {
+        if (!this.currentFile) {
+            this.showNotification('No file selected', 'error');
+            return;
+        }
+
+        // Use the relative path for the view URL, similar to filemanager implementation
+        const fileToView = this.currentFileRelativePath || this.currentFile;
+        const viewUrl = `view/?file=${encodeURIComponent(fileToView)}&style=dark`;
+        
+        // Open in new tab
+        window.open(viewUrl, '_blank');
     }
 
     closeEditor() {

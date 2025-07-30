@@ -47,7 +47,21 @@ try {
             break;
             
         case 'DELETE':
-            handleDelete();
+            // Legacy DELETE method support - redirect to POST with delete action
+            try {
+                $input = json_decode(file_get_contents('php://input'), true);
+                if ($input && isset($input['file'])) {
+                    $fileName = $input['file'];
+                    $result = $fileManager->deleteFile($fileName);
+                    echo json_encode(['success' => true]);
+                } else {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Missing file name']);
+                }
+            } catch (Exception $e) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            }
             break;
             
         default:
@@ -118,6 +132,27 @@ function handlePost() {
             
             $result = $fileManager->saveFile($fileName, $content, $title, $knowledgebaseContext);
             echo json_encode(['success' => true, 'file' => $result]);
+            break;
+            
+        case 'delete':
+            if (!isset($input['file'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing file name']);
+                return;
+            }
+            
+            try {
+                $fileName = $input['file'];
+                error_log("Delete request for file: " . $fileName);
+                
+                $result = $fileManager->deleteFile($fileName);
+                error_log("Delete operation completed successfully");
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                error_log("Delete failed: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            }
             break;
             
         default:
