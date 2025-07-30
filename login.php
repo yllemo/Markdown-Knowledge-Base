@@ -4,7 +4,7 @@
 // Start output buffering to prevent header issues
 ob_start();
 
-require_once 'config.php';
+require_once 'config/config.php';
 
 // Check if setup is needed - only if password protection is enabled but no password is set
 if (getConfig('password_protected') && empty(getConfig('password'))) {

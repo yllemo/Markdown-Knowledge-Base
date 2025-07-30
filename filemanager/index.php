@@ -1,4 +1,17 @@
 <?php
+// filemanager/index.php - Secure File Manager with MDKB authentication
+
+// Start output buffering to prevent header issues
+ob_start();
+
+require_once '../config/config.php';
+
+// Check authentication - use same logic as main MDKB
+if (!isAuthenticated()) {
+    header('Location: ../login.php');
+    exit;
+}
+
 $baseDir = realpath(__DIR__ . '/../content');
 $action = $_POST['action'] ?? null;
 $target = $_POST['target'] ?? null;

@@ -5,7 +5,7 @@ ob_start();
 header('Content-Type: application/json');
 
 try {
-    require_once '../config.php';
+    require_once '../config/config.php';
     
     $debug = [];
     $debug['step1'] = 'Config loaded';

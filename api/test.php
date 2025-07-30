@@ -10,7 +10,7 @@ header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
 try {
-    require_once '../config.php';
+    require_once '../config/config.php';
     
     // Check authentication
     requireAuthentication();

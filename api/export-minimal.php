@@ -4,7 +4,7 @@
 ob_start();
 
 try {
-    require_once '../config.php';
+    require_once '../config/config.php';
     requireAuthentication();
     require_once '../classes/FileManager.php';
     

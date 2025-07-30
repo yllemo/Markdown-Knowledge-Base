@@ -1,7 +1,7 @@
 <?php
 // setup.php - Initial setup script for Knowledge Base System
 
-require_once 'config.php';
+require_once 'config/config.php';
 
 // Check if already configured
 if (getConfig('password_protected') && !empty(getConfig('password'))) {

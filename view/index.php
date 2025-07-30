@@ -25,6 +25,16 @@ $content = preg_replace('/^---[\s\S]*?---\s+/', '', $content, 1);
 $Parsedown = new ParsedownExtra();
 $Parsedown->setSafeMode(false);
 $html = $Parsedown->text($content);
+
+// Convert Mermaid code blocks to divs for rendering
+$html = preg_replace_callback(
+    '/<pre><code class="language-mermaid">(.*?)<\/code><\/pre>/s',
+    function ($matches) {
+        $mermaidCode = htmlspecialchars_decode($matches[1]);
+        return '<div class="mermaid">' . trim($mermaidCode) . '</div>';
+    },
+    $html
+);
 // Convert Markdown checkboxes to real HTML checkboxes
 $html = preg_replace_callback(
     '/<li>\s*\[([ xX])\]\s*(.*?)<\/li>/',
@@ -45,6 +55,11 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?></title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
+    
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -65,17 +80,40 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
         }
         a { color: #0077cc; }
         body.dark a { color: #66aaff; }
-        code {
+        /* Inline code styling */
+        code:not([class*="language-"]) {
             background: rgba(0,0,0,0.05);
             padding: 0.2em 0.4em;
             border-radius: 4px;
-            font-family: monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
-        body.dark code { background: rgba(255,255,255,0.1); }
-        pre code {
+        body.dark code:not([class*="language-"]) { 
+            background: rgba(255,255,255,0.1); 
+        }
+        
+        /* Code blocks with syntax highlighting */
+        pre[class*="language-"] {
+            margin: 1em 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        pre code[class*="language-"] {
             display: block;
             padding: 1em;
             overflow-x: auto;
+            background: transparent !important;
+        }
+        
+        /* Mermaid diagram styling */
+        .mermaid {
+            text-align: center;
+            margin: 1.5em 0;
+            background: transparent;
+        }
+        
+        body.dark .mermaid {
+            filter: invert(1) hue-rotate(180deg);
         }
         blockquote {
             border-left: 6px solid #66aaff;
@@ -118,5 +156,53 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
     <div class="markdown-body">
         <?= $html ?>
     </div>
+    
+    <!-- Prism.js for syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Mermaid for diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <script>
+        // Configure Prism theme based on dark/light mode
+        const isDark = document.body.classList.contains('dark');
+        if (isDark) {
+            // Switch to dark theme for Prism
+            const lightTheme = document.querySelector('link[href*="prism.min.css"]');
+            if (lightTheme) lightTheme.disabled = true;
+        } else {
+            // Switch to light theme for Prism
+            const darkTheme = document.querySelector('link[href*="prism-tomorrow.min.css"]');
+            if (darkTheme) darkTheme.disabled = true;
+        }
+        
+        // Configure Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: {
+                background: isDark ? '#111' : '#fff',
+                primaryColor: isDark ? '#66aaff' : '#0077cc',
+                primaryTextColor: isDark ? '#eee' : '#000',
+                primaryBorderColor: isDark ? '#444' : '#ccc',
+                lineColor: isDark ? '#666' : '#333',
+                secondaryColor: isDark ? '#333' : '#f9f9f9',
+                tertiaryColor: isDark ? '#222' : '#f0f0f0'
+            },
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true
+            }
+        });
+        
+        // Force Prism to highlight after page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof Prism !== 'undefined') {
+                Prism.highlightAll();
+            }
+        });
+    </script>
 </body>
 </html>

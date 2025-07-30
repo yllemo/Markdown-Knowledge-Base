@@ -61,6 +61,20 @@ body {
     display: flex;
     gap: 1rem;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+/* File Manager button styling */
+.header-actions a[href="filemanager/"] {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+    border: none;
+}
+
+.header-actions a[href="filemanager/"]:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(243, 156, 18, 0.3);
 }
 
 .search-input {
@@ -1068,6 +1082,111 @@ textarea[data-1p-ignore="true"] {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* New File Dropdown Styles */
+.new-file-dropdown {
+    position: relative;
+    display: inline-flex;
+}
+
+.btn-split-left {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+}
+
+.btn-split-right {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.7rem;
+    min-width: auto;
+}
+
+.dropdown-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+}
+
+.new-file-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.template-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    min-width: 280px;
+    margin-top: 0.5rem;
+}
+
+.new-file-dropdown.open .template-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.template-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.template-item:last-child {
+    border-bottom: none;
+}
+
+.template-item:hover {
+    background: var(--bg-tertiary);
+    transform: translateX(4px);
+}
+
+.template-item:first-child {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.template-item:last-child {
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.template-icon {
+    font-size: 1.5rem;
+    min-width: 2rem;
+    text-align: center;
+}
+
+.template-info {
+    flex: 1;
+}
+
+.template-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+}
+
+.template-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
 /* Welcome Screen */
 .welcome-screen {
     display: flex;
@@ -1151,6 +1270,16 @@ textarea[data-1p-ignore="true"] {
 }
 
 /* Responsive Design */
+@media (max-width: 1200px) {
+    .header-actions {
+        gap: 0.75rem;
+    }
+    
+    .search-input {
+        width: 200px;
+    }
+}
+
 @media (max-width: 1024px) {
     .app-main {
         grid-template-columns: 280px 1fr;
@@ -1320,6 +1449,35 @@ textarea[data-1p-ignore="true"] {
         display: none;
     }
     
+    /* New File Dropdown Mobile Styles */
+    .new-file-dropdown .btn-split-right {
+        min-width: 44px;
+        padding: 0.5rem;
+    }
+    
+    .template-dropdown {
+        min-width: 250px;
+        right: auto;
+        left: auto;
+        width: max-content;
+    }
+    
+    .template-item {
+        padding: 1rem;
+    }
+    
+    .template-icon {
+        font-size: 1.2rem;
+    }
+    
+    .template-name {
+        font-size: 0.85rem;
+    }
+    
+    .template-desc {
+        font-size: 0.75rem;
+    }
+    
     .browse-content {
         width: 95%;
         padding: 1rem;
@@ -1350,12 +1508,14 @@ textarea[data-1p-ignore="true"] {
     .header-actions {
         width: 100%;
         justify-content: space-between;
+        gap: 0.25rem;
     }
     
     .search-input {
         flex: 1;
         width: auto;
         margin-right: 0.5rem;
+        min-width: 120px;
     }
     
     /* Ensure button text is hidden on smaller screens too */

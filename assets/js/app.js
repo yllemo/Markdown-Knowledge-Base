@@ -58,6 +58,9 @@ class KnowledgeBase {
         
         // Buttons
         this.newFileBtn = document.getElementById('newFileBtn');
+        this.newFileDropdownBtn = document.getElementById('newFileDropdownBtn');
+        this.newFileDropdown = document.getElementById('newFileDropdown');
+        this.newFileDropdownContainer = document.querySelector('.new-file-dropdown');
         this.loadFileBtn = document.getElementById('loadFileBtn');
         this.loadFileInput = document.getElementById('loadFileInput');
         this.saveBtn = document.getElementById('saveBtn');
@@ -79,6 +82,8 @@ class KnowledgeBase {
         console.log('bindEvents called');
         // File operations
         this.newFileBtn.addEventListener('click', () => this.createNewFile());
+        this.newFileDropdownBtn.addEventListener('click', (e) => this.toggleTemplateDropdown(e));
+        this.newFileDropdown.addEventListener('click', (e) => this.handleTemplateSelection(e));
         this.loadFileBtn.addEventListener('click', () => this.loadFileInput.click());
         this.loadFileInput.addEventListener('change', (e) => this.handleLoadFile(e));
         this.saveBtn.addEventListener('click', () => this.saveFile());
@@ -216,6 +221,7 @@ class KnowledgeBase {
         
         // Editor events
         this.markdownEditor.addEventListener('input', () => this.onEditorChange());
+        this.markdownEditor.addEventListener('keydown', (e) => this.handleMarkdownKeydown(e));
         this.fileTitle.addEventListener('input', () => this.markUnsaved());
         this.fileTags.addEventListener('input', () => this.handleTagsInput());
         this.fileTags.addEventListener('paste', (e) => this.handleTagsPaste(e));
@@ -264,6 +270,9 @@ class KnowledgeBase {
         
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => this.handleDocumentClick(e));
         
         // Prevent accidental close
         window.addEventListener('beforeunload', (e) => {
@@ -943,23 +952,25 @@ class KnowledgeBase {
         }
     }
 
-    createNewFile() {
+    createNewFile(template = 'blank') {
         if (this.unsavedChanges) {
             if (!confirm('You have unsaved changes. Do you want to continue?')) {
                 return;
             }
         }
 
-        const fileName = `note-${Date.now()}.md`;
+        const templateData = this.getTemplate(template);
+        const fileName = `${templateData.filename}-${Date.now()}.md`;
+        
         this.currentFile = fileName;
         this.currentFileRelativePath = fileName; // New files start in current context
         this.currentFileKnowledgebase = 'current'; // Will use current selected KB
         this.currentFileInput.value = fileName;
         
-        this.fileTitle.value = 'New Note';
-        this.originalFileTitle = 'New Note'; // Store original title for new files
-        this.fileTags.value = '';
-        this.markdownEditor.value = '# New Note\n\nStart writing here...';
+        this.fileTitle.value = templateData.title;
+        this.originalFileTitle = templateData.title; // Store original title for new files
+        this.fileTags.value = templateData.tags;
+        this.markdownEditor.value = templateData.content;
         
         this.updatePreview();
         this.showEditor();
@@ -976,6 +987,213 @@ class KnowledgeBase {
         // Focus on title
         this.fileTitle.focus();
         this.fileTitle.select();
+    }
+
+    getTemplate(templateType) {
+        const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd format
+        
+        const templates = {
+            blank: {
+                title: 'New Note',
+                filename: 'note',
+                tags: '',
+                content: '# New Note\n\nStart writing here...'
+            },
+            todo: {
+                title: 'Todo List',
+                filename: 'todo',
+                tags: 'tasks, todo',
+                content: `# Todo List
+
+## Today's Tasks
+
+- [ ] Task 1
+- [ ] Task 2
+- [ ] Task 3
+
+## Completed
+- [x] Example completed task
+
+## Notes
+Add any additional notes or context here.`
+            },
+            explainer: {
+                title: 'Concept Explanation',
+                filename: 'explainer',
+                tags: 'explanation, concept',
+                content: `# Concept Explanation
+
+## Overview
+Brief overview of the concept or topic.
+
+## Key Points
+- **Point 1**: Explanation
+- **Point 2**: Explanation
+- **Point 3**: Explanation
+
+## Details
+Detailed explanation with examples.
+
+## Examples
+\`\`\`
+// Code example or other examples
+\`\`\`
+
+## Related Topics
+- Related topic 1
+- Related topic 2
+
+## References
+- [Source 1](https://example.com)
+- [Source 2](https://example.com)`
+            },
+            instructions: {
+                title: 'Step-by-Step Instructions',
+                filename: 'instructions',
+                tags: 'guide, instructions, how-to',
+                content: `# Step-by-Step Instructions
+
+## Overview
+Brief description of what these instructions will help accomplish.
+
+## Prerequisites
+- Requirement 1
+- Requirement 2
+- Requirement 3
+
+## Steps
+
+### Step 1: Preparation
+Detailed explanation of the first step.
+
+### Step 2: Main Action
+Detailed explanation of the main steps.
+
+### Step 3: Verification
+How to verify the process was successful.
+
+## Troubleshooting
+Common issues and solutions:
+
+- **Problem**: Solution
+- **Problem**: Solution
+
+## Additional Notes
+Any additional tips or considerations.`
+            },
+            diary: {
+                title: today,
+                filename: `diary-${today}`,
+                tags: 'diary, journal, personal',
+                content: `# ${today}
+
+## Today's Focus
+What did I want to accomplish today?
+
+## What Happened
+Key events, thoughts, and activities from today.
+
+## Reflections
+- What went well?
+- What could be improved?
+- What did I learn?
+
+## Tomorrow's Goals
+- Goal 1
+- Goal 2
+- Goal 3
+
+## Mood: ⭐⭐⭐⭐⭐
+Rate your day (1-5 stars)
+
+## Additional Notes
+Any other thoughts or observations.`
+            },
+            'ai-prompt': {
+                title: 'AI Prompt Template',
+                filename: 'ai-prompt',
+                tags: 'ai, prompt, llm, chatgpt, claude',
+                content: `# AI Prompt Template
+
+## Prompt Title
+Brief descriptive title for this prompt
+
+## Purpose
+What this prompt is designed to accomplish or solve.
+
+## Context/Background
+Any necessary background information or context the AI needs to understand.
+
+## The Prompt
+
+\`\`\`
+[Your AI prompt goes here]
+
+Be specific about:
+- The role or persona the AI should adopt
+- The task or objective
+- The format of the desired output
+- Any constraints or guidelines
+- Examples if helpful
+\`\`\`
+
+## Expected Output
+Description of what kind of response you expect from the AI.
+
+## Variations
+Alternative versions or modifications of the prompt:
+
+### Version 1 (Basic)
+\`\`\`
+Simplified version of the prompt
+\`\`\`
+
+### Version 2 (Detailed)
+\`\`\`
+More detailed or specific version
+\`\`\`
+
+## Test Results
+Record how well the prompt works:
+
+- **AI Model**: Which AI was used (GPT-4, Claude, etc.)
+- **Quality**: Rate the output quality (1-5)
+- **Consistency**: How consistent are the results
+- **Notes**: Any observations or improvements needed
+
+## Related Prompts
+- Link to similar prompts
+- Variations for different use cases
+
+## Tags
+#ai #prompt #${today.replace(/-/g, '')}`
+            }
+        };
+        
+        return templates[templateType] || templates.blank;
+    }
+
+    toggleTemplateDropdown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.newFileDropdownContainer.classList.toggle('open');
+    }
+
+    handleTemplateSelection(e) {
+        e.stopPropagation();
+        const templateItem = e.target.closest('.template-item');
+        if (!templateItem) return;
+        
+        const template = templateItem.dataset.template;
+        this.newFileDropdownContainer.classList.remove('open');
+        this.createNewFile(template);
+    }
+
+    handleDocumentClick(e) {
+        // Close template dropdown if clicking outside
+        if (!this.newFileDropdownContainer.contains(e.target)) {
+            this.newFileDropdownContainer.classList.remove('open');
+        }
     }
 
     async handleLoadFile(event) {
@@ -1188,11 +1406,22 @@ class KnowledgeBase {
     }
 
     async deleteFile() {
-        if (!this.currentFile) return;
+        console.log('Delete file called');
+        console.log('Current file:', this.currentFile);
+        console.log('Current file relative path:', this.currentFileRelativePath);
+        
+        if (!this.currentFile) {
+            console.log('No current file set, returning');
+            this.showNotification('No file selected for deletion', 'error');
+            return;
+        }
 
         if (!confirm('Are you sure you want to delete this file? This action cannot be undone.')) {
             return;
         }
+
+        const fileToDelete = this.currentFileRelativePath || this.currentFile;
+        console.log('Attempting to delete file:', fileToDelete);
 
         try {
             const response = await fetch('api/files.php', {
@@ -1201,11 +1430,19 @@ class KnowledgeBase {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    file: this.currentFileRelativePath || this.currentFile
+                    file: fileToDelete
                 })
             });
 
+            console.log('Delete response status:', response.status);
+            console.log('Delete response ok:', response.ok);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const result = await response.json();
+            console.log('Delete API result:', result);
             
             if (result.error) {
                 console.error('Delete API error:', result.error);
@@ -1315,6 +1552,209 @@ class KnowledgeBase {
     onEditorChange() {
         this.updatePreview();
         this.markUnsaved();
+    }
+
+    handleMarkdownKeydown(e) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        
+        // Handle Enter key for markdown list autocomplete
+        if (e.key === 'Enter') {
+            const beforeCursor = value.substring(0, cursorPosition);
+            const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
+            const currentLine = beforeCursor.substring(currentLineStart);
+            
+            // Check for bullet lists (-, *, +)
+            const bulletListRegex = /^(\s*)([-*+] \[ \] |[-*+] \[x\] |[-*+] )/;
+            const bulletMatch = currentLine.match(bulletListRegex);
+            
+            // Check for numbered lists (1. 2. 3.)
+            const numberedListRegex = /^(\s*)(\d+)\. /;
+            const numberedMatch = currentLine.match(numberedListRegex);
+            
+            if (bulletMatch) {
+                this.handleBulletListEnter(e, currentLine, currentLineStart, bulletMatch);
+            } else if (numberedMatch) {
+                this.handleNumberedListEnter(e, currentLine, currentLineStart, numberedMatch);
+            }
+        }
+        
+        // Handle auto-closing for bold/italic/code
+        else if (e.key === '*') {
+            this.handleAsteriskAutoClose(e);
+        } else if (e.key === '`') {
+            this.handleBacktickAutoClose(e);
+        } else if (e.key === '"' || e.key === "'" || e.key === '(' || e.key === '[' || e.key === '{') {
+            this.handlePairingChars(e);
+        }
+    }
+
+    handleBulletListEnter(e, currentLine, currentLineStart, match) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const beforeCursor = value.substring(0, cursorPosition);
+        
+        const indent = match[1];
+        const listPrefix = match[2];
+        
+        // If empty list item, exit list
+        if (currentLine.trim() === listPrefix.trim()) {
+            e.preventDefault();
+            const newValue = value.substring(0, currentLineStart) + '\n' + value.substring(cursorPosition);
+            textarea.value = newValue;
+            textarea.setSelectionRange(currentLineStart + 1, currentLineStart + 1);
+            this.onEditorChange();
+        } else {
+            // Continue list
+            e.preventDefault();
+            let newPrefix = listPrefix;
+            if (listPrefix.includes('[x]')) {
+                newPrefix = listPrefix.replace('[x]', '[ ]');
+            }
+            
+            const newLine = '\n' + indent + newPrefix;
+            const afterCursor = value.substring(cursorPosition);
+            const newValue = beforeCursor + newLine + afterCursor;
+            
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + newLine.length, cursorPosition + newLine.length);
+            this.onEditorChange();
+        }
+    }
+
+    handleNumberedListEnter(e, currentLine, currentLineStart, match) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const beforeCursor = value.substring(0, cursorPosition);
+        
+        const indent = match[1];
+        const currentNumber = parseInt(match[2]);
+        
+        // If empty numbered item, exit list
+        if (currentLine.trim() === `${currentNumber}. `) {
+            e.preventDefault();
+            const newValue = value.substring(0, currentLineStart) + '\n' + value.substring(cursorPosition);
+            textarea.value = newValue;
+            textarea.setSelectionRange(currentLineStart + 1, currentLineStart + 1);
+            this.onEditorChange();
+        } else {
+            // Continue with next number
+            e.preventDefault();
+            const nextNumber = currentNumber + 1;
+            const newLine = '\n' + indent + nextNumber + '. ';
+            const afterCursor = value.substring(cursorPosition);
+            const newValue = beforeCursor + newLine + afterCursor;
+            
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + newLine.length, cursorPosition + newLine.length);
+            this.onEditorChange();
+        }
+    }
+
+    handleAsteriskAutoClose(e) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+        
+        // If text is selected, wrap it
+        if (selectedText) {
+            e.preventDefault();
+            const beforeSelection = value.substring(0, textarea.selectionStart);
+            const afterSelection = value.substring(textarea.selectionEnd);
+            const newValue = beforeSelection + '*' + selectedText + '*' + afterSelection;
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + 1, cursorPosition + 1 + selectedText.length);
+            this.onEditorChange();
+        }
+        // If at start of word or after space, create pair
+        else {
+            const charBefore = cursorPosition > 0 ? value[cursorPosition - 1] : '';
+            const charAfter = cursorPosition < value.length ? value[cursorPosition] : '';
+            
+            if ((charBefore === '' || charBefore === ' ' || charBefore === '\n') && 
+                (charAfter === '' || charAfter === ' ' || charAfter === '\n' || charAfter === '.')) {
+                e.preventDefault();
+                const newValue = value.substring(0, cursorPosition) + '**' + value.substring(cursorPosition);
+                textarea.value = newValue;
+                textarea.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+                this.onEditorChange();
+            }
+        }
+    }
+
+    handleBacktickAutoClose(e) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+        
+        // Check for triple backtick (code block)
+        const beforeCursor = value.substring(0, cursorPosition);
+        const lineStart = beforeCursor.lastIndexOf('\n') + 1;
+        const currentLine = beforeCursor.substring(lineStart);
+        
+        if (currentLine === '``') {
+            // Create code block
+            e.preventDefault();
+            const newValue = value.substring(0, cursorPosition) + '`\n\n```' + value.substring(cursorPosition);
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + 2, cursorPosition + 2);
+            this.onEditorChange();
+        }
+        // If text is selected, wrap it in inline code
+        else if (selectedText) {
+            e.preventDefault();
+            const beforeSelection = value.substring(0, textarea.selectionStart);
+            const afterSelection = value.substring(textarea.selectionEnd);
+            const newValue = beforeSelection + '`' + selectedText + '`' + afterSelection;
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + 1, cursorPosition + 1 + selectedText.length);
+            this.onEditorChange();
+        }
+    }
+
+    handlePairingChars(e) {
+        const textarea = this.markdownEditor;
+        const value = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+        
+        const pairs = {
+            '"': '"',
+            "'": "'",
+            '(': ')',
+            '[': ']',
+            '{': '}'
+        };
+        
+        const closingChar = pairs[e.key];
+        if (!closingChar) return;
+        
+        // If text is selected, wrap it
+        if (selectedText) {
+            e.preventDefault();
+            const beforeSelection = value.substring(0, textarea.selectionStart);
+            const afterSelection = value.substring(textarea.selectionEnd);
+            const newValue = beforeSelection + e.key + selectedText + closingChar + afterSelection;
+            textarea.value = newValue;
+            textarea.setSelectionRange(cursorPosition + 1, cursorPosition + 1 + selectedText.length);
+            this.onEditorChange();
+        }
+        // Auto-close if appropriate
+        else {
+            const charAfter = cursorPosition < value.length ? value[cursorPosition] : '';
+            if (charAfter === '' || charAfter === ' ' || charAfter === '\n') {
+                e.preventDefault();
+                const newValue = value.substring(0, cursorPosition) + e.key + closingChar + value.substring(cursorPosition);
+                textarea.value = newValue;
+                textarea.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+                this.onEditorChange();
+            }
+        }
     }
 
     handleTagsInput() {

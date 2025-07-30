@@ -196,39 +196,53 @@ class FileManager {
     public function deleteFile($fileName) {
         // Debug logging
         error_log("FileManager::deleteFile called with: " . $fileName);
+        error_log("ContentDir: " . $this->contentDir);
         
         // Security: Prevent directory traversal
         if (strpos($fileName, '..') !== false || strpos($fileName, '\\') !== false) {
+            error_log("Security check failed: Invalid file path: $fileName");
             throw new Exception("Invalid file path: $fileName");
         }
         
         $filePath = $this->getFilePath($fileName);
         error_log("Resolved file path: " . $filePath);
+        error_log("File exists check: " . (file_exists($filePath) ? 'yes' : 'no'));
         
         // Security: Ensure the resolved path is within content directory
         $realContentDir = realpath($this->contentDir);
         if (!$realContentDir) {
+            error_log("Cannot resolve content directory: " . $this->contentDir);
             throw new Exception("Cannot resolve content directory path");
         }
+        error_log("Real content dir: " . $realContentDir);
         
         // For security check, use the directory of the file path
         $fileDir = dirname($filePath);
         $realFileDir = realpath($fileDir);
+        error_log("File dir: " . $fileDir);
+        error_log("Real file dir: " . ($realFileDir ? $realFileDir : 'false'));
+        
         if ($realFileDir && strpos($realFileDir, $realContentDir) !== 0) {
+            error_log("Security check failed: File path outside content directory");
             throw new Exception("File path outside content directory: $fileName");
         }
         
         if (!file_exists($filePath)) {
+            error_log("File not found: " . $filePath);
             throw new Exception("File not found: $fileName");
         }
         
         // Create backup before deletion
+        error_log("Creating backup for: " . $filePath);
         $this->createBackup($filePath);
         
+        error_log("Attempting to unlink: " . $filePath);
         if (!unlink($filePath)) {
+            error_log("Failed to unlink file: " . $filePath);
             throw new Exception("Failed to delete file: $fileName");
         }
         
+        error_log("File successfully deleted: " . $filePath);
         return true;
     }
     
@@ -356,6 +370,14 @@ class FileManager {
     }
     
     private function getFilePath($fileName) {
+        // If fileName contains a path separator, it might be a relative path from content root
+        if (strpos($fileName, '/') !== false) {
+            // For files like "knowledgebase/file.md", we need to go up to the base content directory
+            $baseContentDir = dirname($this->contentDir) . '/content';
+            return $baseContentDir . '/' . $fileName;
+        }
+        
+        // For simple filenames, use the current content directory
         return $this->contentDir . '/' . $fileName;
     }
     

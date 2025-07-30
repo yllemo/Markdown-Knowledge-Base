@@ -9,7 +9,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
-require_once '../config.php';
+require_once '../config/config.php';
 
 // Check authentication
 requireAuthentication();
@@ -131,7 +131,13 @@ function handleDelete() {
     try {
         $input = json_decode(file_get_contents('php://input'), true);
         
+        // Debug logging
+        error_log("DELETE request received");
+        error_log("Raw input: " . file_get_contents('php://input'));
+        error_log("Decoded input: " . print_r($input, true));
+        
         if (!$input || !isset($input['file'])) {
+            error_log("Missing file parameter in delete request");
             http_response_code(400);
             echo json_encode(['error' => 'Missing file name']);
             return;
@@ -143,16 +149,20 @@ function handleDelete() {
         // Debug logging
         error_log("Delete request for file: " . $fileName);
         error_log("Content path: " . $contentPath);
+        error_log("FileManager instance: " . (is_object($fileManager) ? 'exists' : 'null'));
         
-        $fileManager->deleteFile($fileName);
+        $result = $fileManager->deleteFile($fileName);
+        error_log("Delete operation completed successfully");
         echo json_encode(['success' => true]);
         
     } catch (Exception $e) {
-        error_log("Delete failed: " . $e->getMessage());
+        error_log("Delete failed with Exception: " . $e->getMessage());
+        error_log("Exception trace: " . $e->getTraceAsString());
         http_response_code(500);
         echo json_encode(['error' => $e->getMessage()]);
     } catch (Error $e) {
-        error_log("Delete PHP Error: " . $e->getMessage());
+        error_log("Delete failed with PHP Error: " . $e->getMessage());
+        error_log("Error trace: " . $e->getTraceAsString());
         http_response_code(500);
         echo json_encode(['error' => 'PHP Error: ' . $e->getMessage()]);
     }

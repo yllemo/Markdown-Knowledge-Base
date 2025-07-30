@@ -4,7 +4,7 @@
 // Start output buffering to prevent header issues
 ob_start();
 
-require_once 'config.php';
+require_once 'config/config.php';
 
 // Check authentication
 if (!isAuthenticated()) {
@@ -64,8 +64,58 @@ $allTags = $tagManager->getAllTags();
                        data-lpignore="true"
                        data-1p-ignore="true"
                        name="search_input_field">
-                <button id="newFileBtn" class="btn btn-primary">+<span class="btn-text"> New File</span></button>
+                <div class="new-file-dropdown">
+                    <button id="newFileBtn" class="btn btn-primary btn-split-left">+<span class="btn-text"> New File</span></button>
+                    <button id="newFileDropdownBtn" class="btn btn-primary btn-split-right" title="Choose template">
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div id="newFileDropdown" class="template-dropdown">
+                        <div class="template-item" data-template="blank">
+                            <span class="template-icon">📄</span>
+                            <div class="template-info">
+                                <div class="template-name">Blank Document</div>
+                                <div class="template-desc">Empty markdown file</div>
+                            </div>
+                        </div>
+                        <div class="template-item" data-template="todo">
+                            <span class="template-icon">✅</span>
+                            <div class="template-info">
+                                <div class="template-name">Todo List</div>
+                                <div class="template-desc">Task checklist template</div>
+                            </div>
+                        </div>
+                        <div class="template-item" data-template="explainer">
+                            <span class="template-icon">💡</span>
+                            <div class="template-info">
+                                <div class="template-name">Explainer</div>
+                                <div class="template-desc">Concept explanation template</div>
+                            </div>
+                        </div>
+                        <div class="template-item" data-template="instructions">
+                            <span class="template-icon">📋</span>
+                            <div class="template-info">
+                                <div class="template-name">Instructions</div>
+                                <div class="template-desc">Step-by-step guide template</div>
+                            </div>
+                        </div>
+                        <div class="template-item" data-template="diary">
+                            <span class="template-icon">📅</span>
+                            <div class="template-info">
+                                <div class="template-name">Diary Entry</div>
+                                <div class="template-desc">Daily journal with today's date</div>
+                            </div>
+                        </div>
+                        <div class="template-item" data-template="ai-prompt">
+                            <span class="template-icon">🤖</span>
+                            <div class="template-info">
+                                <div class="template-name">AI Prompt</div>
+                                <div class="template-desc">Template for AI prompts and instructions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <button id="loadFileBtn" class="btn btn-secondary" title="Load .md file">📁<span class="btn-text"> Load</span></button>
+                <a href="filemanager/" class="btn btn-secondary" title="File Manager">📂<span class="btn-text"> File Manager</span></a>
                 <button id="exportBtn" class="btn btn-secondary" title="Export all files as ZIP">📤<span class="btn-text"> Export</span></button>
                 <button id="importBtn" class="btn btn-secondary" title="Import files from ZIP">📥<span class="btn-text"> Import</span></button>
                 <button id="settingsBtn" class="btn btn-secondary" title="Settings">⚙️</button>
