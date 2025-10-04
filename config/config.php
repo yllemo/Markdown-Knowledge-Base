@@ -4,7 +4,7 @@
 // Site Settings
 $config = [
     'site_title' => 'Markdown Knowledge Base (MDKB)',
-    'password_protected' => false, // Enable password protection by default
+    'password_protected' => true, // Enable password protection by default
     'password' => 'mdkb', // Default password - change this in setup
     'session_timeout' => 31536000, // 12 months in seconds
     'max_file_size' => 10485760, // 10MB in bytes
