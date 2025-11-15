@@ -59,10 +59,13 @@ $allTags = $tagManager->getAllTags();
             </div>
             <div class="header-actions">
                 <input type="text" id="searchInput" placeholder="Search files..." class="search-input"
-                       autocomplete="off" 
+                       autocomplete="new-password"
                        data-form-type="other" 
                        data-lpignore="true"
                        data-1p-ignore="true"
+                       data-bwignore="true"
+                       data-dashlane-ignore="true"
+                       role="searchbox"
                        name="search_input_field">
                 <div class="new-file-dropdown">
                     <button id="newFileBtn" class="btn btn-primary btn-split-left">+<span class="btn-text"> New File</span></button>
@@ -243,10 +246,14 @@ $allTags = $tagManager->getAllTags();
                 <button class="close-modal" onclick="window.kb.closeBrowseModal()">✕</button>
             </div>
             <input type="text" id="browseSearch" class="browse-search" placeholder="Search..."
-                   autocomplete="off" 
+                   autocomplete="off"
+                   autocomplete="new-password"
                    data-form-type="other" 
                    data-lpignore="true"
                    data-1p-ignore="true"
+                   data-bwignore="true"
+                   data-dashlane-ignore="true"
+                   role="searchbox"
                    name="browse_search_field">
             <div id="browseList" class="browse-list">
                 <!-- Content will be populated by JavaScript -->

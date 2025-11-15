@@ -48,10 +48,11 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 - Custom favicon and header icon support
 - **Advanced Markdown Support:**
   - Syntax highlighting with Prism.js (supports 200+ languages)
-  - Mermaid diagrams and flowcharts
-  - Interactive checkboxes from markdown task lists
+  - Mermaid v11 diagrams with icon support and fullscreen viewing
+  - Interactive checkboxes from markdown task lists (with persistence)
   - SVG image inversion for dark/light mode compatibility
-- **Standalone Markdown Viewer** - Direct viewing of .md files with themes
+  - Full-text search across all content
+- **Standalone Markdown Viewer** - Direct viewing of .md files with themes and interactive features
 
 ## Quick Start
 
@@ -108,8 +109,23 @@ For production environments:
 - Log in with your configured password.
 - Create, edit, and tag Markdown notes.
 - **Load existing .md files**: Click the "📁 Load" button to import .md files from your local storage
-- Use the sidebar or search to find notes.
+- Use the sidebar or **full-text search** to find notes across all content.
 - Click the Files/Tags headers or stats to browse all.
+
+### Enhanced Full-Text Search
+
+MDKB features powerful full-text search that searches across:
+- **File titles** (highest priority)
+- **Complete file content** (all text in your markdown files)
+- **Metadata** (descriptions, tags, etc.)
+- **Code blocks** (technical terms and code)
+- **Headings** (section titles)
+
+**Search Features:**
+- **Partial Matching**: Files matching at least one search term are included
+- **Relevance Scoring**: Results are ranked by relevance (more matches = higher rank)
+- **Smart Filtering**: Use operators like `tag:`, `title:`, `-` (exclude), and quoted phrases
+- **No Password Manager Interference**: Search fields are properly configured to prevent password manager popups
 
 ### Advanced Markdown Features
 
@@ -122,24 +138,41 @@ function hello() {
 }
 ```
 
-#### Mermaid Diagrams
-Create flowcharts, sequence diagrams, and more using Mermaid syntax:
+#### Mermaid Diagrams (v11 with Icon Support)
+Create flowcharts, sequence diagrams, and more using Mermaid v11 syntax with full icon support:
 
 ```mermaid
 graph TD
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Action 1]
-    B -->|No| D[Action 2]
+    A[Start :fa:rocket] --> B{Decision :mdi:github}
+    B -->|Yes| C[Action 1 :logos:javascript]
+    B -->|No| D[Action 2 :simple-icons:php]
 ```
 
+**Mermaid Features:**
+- **Latest Version**: Powered by Mermaid v11 with full icon support
+- **Icon Packs**: Use icons from Font Awesome, Material Design Icons, Logos, Simple Icons, and Material Symbols
+- **Fullscreen Viewing**: Click any diagram to open it in a fullscreen popup
+- **Pan & Zoom**: In fullscreen mode, drag to pan and scroll to zoom (0.5x - 3x)
+- **Code Viewing**: View and copy the original Mermaid code with one click
+- **Dark/Light Mode**: Diagrams automatically adapt to your theme
+
+**Icon Syntax**: Use `:pack:icon-name` format (e.g., `:fa:user`, `:mdi:github`, `:logos:javascript`)
+
 #### Interactive Checkboxes
-Transform markdown task lists into interactive checkboxes:
+Transform markdown task lists into interactive checkboxes with persistent state:
 
 ```markdown
 - [x] Completed task
 - [ ] Pending task
 - [ ] Another task
 ```
+
+**Checkbox Features:**
+- **Persistent State**: Checkbox status is saved in your browser (localStorage)
+- **Visual Feedback**: Completed tasks are shown with strikethrough and muted colors
+- **Works Everywhere**: Interactive in both editor and standalone viewer
+- **Reset Option**: Use `?reset=true` query parameter in viewer to reset checkbox states
+- **Per-File Storage**: Each file maintains its own checkbox state independently
 
 #### SVG Image Inversion
 Make SVG images adapt to dark/light themes by specifying their base color:
@@ -150,7 +183,22 @@ Make SVG images adapt to dark/light themes by specifying their base color:
 ```
 
 #### Standalone Viewer
-View any markdown file directly with: `/view/?file=filename.md&style=dark` or `&style=light`
+View any markdown file directly with full interactive features:
+
+**Basic Usage:**
+- `/view/?file=filename.md&style=dark` - View with dark theme
+- `/view/?file=filename.md&style=light` - View with light theme
+
+**Advanced Options:**
+- `/view/?file=filename.md&style=dark&reset=true` - Reset checkbox states to original file state
+
+**Viewer Features:**
+- Interactive checkboxes with persistent state
+- Mermaid diagram fullscreen viewing with pan/zoom
+- Code viewing and copying for Mermaid diagrams
+- Syntax highlighting for code blocks
+- Dark/light theme support
+- Responsive design for all devices
 
 ## Configuration
 - All settings are in `config.php` (or override in `config.custom.php`).

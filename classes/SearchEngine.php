@@ -132,28 +132,39 @@ class SearchEngine {
             }
         }
         
-        // Regular term matching - only score if terms are found
+        // Regular term matching - improved fulltext search
         $termMatchScore = 0;
+        $matchedTerms = 0;
+        $totalTerms = count($parsedQuery['terms']);
+        
         foreach ($parsedQuery['terms'] as $term) {
             $termLower = strtolower($term);
+            $termMatched = false;
             
             if ($parsedQuery['title_only']) {
                 // Search only in title
                 if (strpos($titleLower, $termLower) !== false) {
                     $termMatchScore += 150;
+                    $termMatched = true;
                 }
             } else {
                 // Title matches are highly weighted
-                $titleMatches = substr_count($titleLower, $termLower);
-                $termMatchScore += $titleMatches * 100;
+                if (strpos($titleLower, $termLower) !== false) {
+                    $titleMatches = substr_count($titleLower, $termLower);
+                    $termMatchScore += $titleMatches * 100;
+                    $termMatched = true;
+                }
                 
-                // Content matches
-                $contentMatches = substr_count($contentLower, $termLower);
-                $termMatchScore += $contentMatches * 10;
-                
-                // Bonus for word boundaries
-                if (preg_match('/\b' . preg_quote($termLower, '/') . '\b/', $contentLower)) {
-                    $termMatchScore += 20;
+                // Content matches - search in full content
+                if (strpos($contentLower, $termLower) !== false) {
+                    $contentMatches = substr_count($contentLower, $termLower);
+                    $termMatchScore += $contentMatches * 10;
+                    $termMatched = true;
+                    
+                    // Bonus for word boundaries (exact word match)
+                    if (preg_match('/\b' . preg_quote($termLower, '/') . '\b/', $contentLower)) {
+                        $termMatchScore += 20;
+                    }
                 }
                 
                 // Bonus for matches in headings
@@ -161,17 +172,46 @@ class SearchEngine {
                     $termMatchScore += 30;
                 }
                 
-                // Check metadata fields
+                // Check metadata fields (description, tags, etc.)
                 if (isset($metadata['description']) && 
                     strpos(strtolower($metadata['description']), $termLower) !== false) {
                     $termMatchScore += 25;
+                    $termMatched = true;
                 }
+                
+                // Search in tags
+                if (isset($metadata['tags']) && is_array($metadata['tags'])) {
+                    foreach ($metadata['tags'] as $tag) {
+                        if (strpos(strtolower($tag), $termLower) !== false) {
+                            $termMatchScore += 30;
+                            $termMatched = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // Search in code blocks (for technical terms)
+                if (preg_match('/```[\s\S]*?' . preg_quote($termLower, '/') . '[\s\S]*?```/i', $content)) {
+                    $termMatchScore += 15;
+                    $termMatched = true;
+                }
+            }
+            
+            if ($termMatched) {
+                $matchedTerms++;
             }
         }
         
-        // Only add to score if we found term matches
-        if ($termMatchScore > 0) {
+        // Add to score if we found any term matches
+        // Allow partial matches - if at least one term matches, include the file
+        if ($termMatchScore > 0 || $matchedTerms > 0) {
             $score += $termMatchScore;
+            
+            // Bonus for matching more terms
+            if ($totalTerms > 0) {
+                $matchRatio = $matchedTerms / $totalTerms;
+                $score += $matchRatio * 50; // Up to 50 bonus points for matching all terms
+            }
             
             // Boost recent files slightly (only for files that match search terms)
             $daysSinceModified = (time() - $file['modified']) / (24 * 60 * 60);
