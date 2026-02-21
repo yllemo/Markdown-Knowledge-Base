@@ -53,6 +53,8 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
   - SVG image inversion for dark/light mode compatibility
   - Full-text search across all content
 - **Standalone Markdown Viewer** - Direct viewing of .md files with themes and interactive features
+- **Monaco Editor** - In-browser markdown code editor (VS Code engine) with download support
+- **Collaboration View** - Comment on any block of content with a slide-in panel and persistent storage
 
 ## Quick Start
 
@@ -199,6 +201,35 @@ View any markdown file directly with full interactive features:
 - Syntax highlighting for code blocks
 - Dark/light theme support
 - Responsive design for all devices
+
+#### Markdown Editor (Monaco)
+Edit any markdown file in-browser using the Monaco Editor (the same engine that powers VS Code):
+
+**Usage:**
+- `/edit/?file=filename.md&style=dark` - Edit with dark theme
+- `/edit/?file=filename.md&style=light` - Edit with light theme
+
+**Editor Features:**
+- Full Monaco Editor with markdown syntax highlighting
+- Word wrap, minimap, and line numbers enabled by default
+- Dark/light theme support (`vs-dark` / `vs`)
+- Download edited content as `.md` file
+- In-memory only - no changes are saved to the server
+
+#### Collaboration View
+Share a markdown file for collaborative review with inline commenting:
+
+**Usage:**
+- `/colab/?file=filename.md&style=dark` - Open in dark theme
+- `/colab/?file=filename.md&style=light` - Open in light theme
+
+**Collaboration Features:**
+- **Block-level commenting**: Hover over any heading, paragraph, list, or code block to reveal a comment button
+- **Slide-in comment panel**: View, add, resolve, and delete comments per block
+- **Persistent comments**: Comments are stored server-side via the comments API (`/api/comments.php`)
+- **Named authors**: Set your display name (saved in localStorage) for comment attribution
+- **Rendered markdown view**: Full Parsedown rendering with Mermaid diagrams, syntax highlighting, and SVG inversion
+- **Read-only checkboxes**: Task lists are displayed but not interactive in collaboration mode
 
 ## Configuration
 - All settings are in `config.php` (or override in `config.custom.php`).
