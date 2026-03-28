@@ -5,6 +5,7 @@
 ob_start();
 
 require_once '../config/config.php';
+require_once '../classes/SearchEngine.php';
 
 // Check authentication - use same logic as main MDKB
 if (!isAuthenticated()) {
@@ -15,7 +16,21 @@ if (!isAuthenticated()) {
 $baseDir = realpath(__DIR__ . '/../content');
 $action = $_POST['action'] ?? null;
 $target = $_POST['target'] ?? null;
+$searchQuery = $_GET['search'] ?? '';
 $response = '';
+
+// Initialize search engine
+$searchEngine = new SearchEngine('../content');
+$searchResults = [];
+
+// Handle search requests
+if (!empty($searchQuery)) {
+    $searchResults = $searchEngine->search($searchQuery);
+    // Filter only markdown files
+    $searchResults = array_filter($searchResults, function($file) {
+        return preg_match('/\.(md|markdown)$/i', $file['name']);
+    });
+}
 
 // Secure path check
 function isInBaseDir($path, $base) {
@@ -213,6 +228,74 @@ function listRootFiles($dir, $base) {
             margin-bottom: 20px;
             border-left: 4px solid limegreen;
         }
+        .search-container {
+            background: #2b2b2b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #444;
+        }
+        .search-box {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px;
+            font-size: 16px;
+            background: #1e1e1e;
+            color: #ccc;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .search-results {
+            background: #2d2d2d;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007acc;
+        }
+        .search-result-item {
+            background: #3a3a3a;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border-left: 3px solid #007acc;
+        }
+        .search-result-title {
+            color: #4db8ff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .search-result-path {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .search-result-excerpt {
+            color: #ccc;
+            line-height: 1.4;
+        }
+        .file-list {
+            transition: opacity 0.3s ease;
+        }
+        .file-list.filtered {
+            opacity: 0.6;
+        }
+        .highlight {
+            background-color: #ffd700;
+            color: #000;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+        .clear-search {
+            background: #666;
+            margin-left: 10px;
+        }
+        .clear-search:hover {
+            background: #888;
+        }
     </style>
 </head>
 <body>
@@ -221,11 +304,71 @@ function listRootFiles($dir, $base) {
         <div class="response"><?= $response ?></div>
     <?php endif; ?>
 
-    <?= listFoldersAndContents($baseDir, $baseDir) ?>
+    <!-- Search Container -->
+    <div class="search-container">
+        <h3>🔍 Search Markdown Files</h3>
+        <form method="GET" style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" name="search" class="search-box" 
+                   placeholder="Search in markdown files (filename or content)..." 
+                   value="<?= htmlspecialchars($searchQuery) ?>"
+                   id="searchInput">
+            <button type="submit">Search</button>
+            <?php if (!empty($searchQuery)): ?>
+                <button type="button" class="clear-search" onclick="clearSearch()">Clear</button>
+            <?php endif; ?>
+        </form>
+        
+        <div style="margin-top: 10px; color: #888; font-size: 14px;">
+            <strong>Live Filter:</strong> Type below to filter visible files in real-time
+        </div>
+        <input type="text" id="liveFilter" class="search-box" 
+               placeholder="Filter visible files by name..." 
+               style="margin-top: 8px; max-width: 300px;">
+    </div>
 
-    <hr>
-    <h3>📄 Files in root</h3>
-    <?= listRootFiles($baseDir, $baseDir) ?>
+    <!-- Search Results -->
+    <?php if (!empty($searchQuery)): ?>
+        <div class="search-results">
+            <h3>Search Results for "<?= htmlspecialchars($searchQuery) ?>"</h3>
+            <?php if (empty($searchResults)): ?>
+                <p>No markdown files found matching your search.</p>
+            <?php else: ?>
+                <p>Found <?= count($searchResults) ?> markdown file(s):</p>
+                <?php foreach ($searchResults as $result): ?>
+                    <div class="search-result-item">
+                        <div class="search-result-title">
+                            <?php 
+                            $viewUrl = "../view/?file=" . urlencode($result['relative_path']) . "&style=dark";
+                            ?>
+                            <a href="<?= $viewUrl ?>" target="_blank" style="color: #4db8ff; text-decoration: none;">
+                                📄 <?= htmlspecialchars($result['name']) ?>
+                            </a>
+                        </div>
+                        <div class="search-result-path">
+                            <?= htmlspecialchars($result['relative_path']) ?>
+                        </div>
+                        <?php if (!empty($result['excerpt'])): ?>
+                            <div class="search-result-excerpt">
+                                <?= $result['excerpt'] ?>
+                            </div>
+                        <?php endif; ?>
+                        <div style="margin-top: 8px;">
+                            <button onclick="editFile('<?= htmlspecialchars($result['relative_path'], ENT_QUOTES) ?>')" 
+                                    style="font-size: 12px;">Edit</button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="file-list" id="fileList">
+        <?= listFoldersAndContents($baseDir, $baseDir) ?>
+
+        <hr>
+        <h3>📄 Files in root</h3>
+        <?= listRootFiles($baseDir, $baseDir) ?>
+    </div>
 
     <!-- Modal -->
     <div class="modal" id="editorModal">
@@ -276,6 +419,70 @@ function listRootFiles($dir, $base) {
         function closeModal() {
             document.getElementById('editorModal').style.display = 'none';
         }
+
+        function clearSearch() {
+            window.location.href = window.location.pathname;
+        }
+
+        // Live filtering functionality
+        document.getElementById('liveFilter').addEventListener('input', function(e) {
+            const filterText = e.target.value.toLowerCase();
+            const fileList = document.getElementById('fileList');
+            const fileItems = fileList.querySelectorAll('.file, .folder');
+            let visibleCount = 0;
+
+            fileItems.forEach(function(item) {
+                const text = item.textContent.toLowerCase();
+                const isMarkdown = text.includes('.md') || text.includes('.markdown');
+                
+                if (filterText === '' || (text.includes(filterText) && isMarkdown)) {
+                    item.style.display = 'block';
+                    if (isMarkdown || item.classList.contains('folder')) {
+                        visibleCount++;
+                    }
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            // Visual feedback
+            if (filterText !== '') {
+                fileList.classList.add('filtered');
+            } else {
+                fileList.classList.remove('filtered');
+            }
+        });
+
+        // Highlight search terms in results
+        function highlightSearchTerms() {
+            const searchQuery = '<?= addslashes($searchQuery) ?>';
+            if (searchQuery) {
+                const terms = searchQuery.split(' ');
+                const excerpts = document.querySelectorAll('.search-result-excerpt');
+                
+                excerpts.forEach(function(excerpt) {
+                    let html = excerpt.innerHTML;
+                    terms.forEach(function(term) {
+                        if (term.length > 2) {
+                            const regex = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                            html = html.replace(regex, '<span class="highlight">$1</span>');
+                        }
+                    });
+                    excerpt.innerHTML = html;
+                });
+            }
+        }
+
+        // Initialize highlighting on page load
+        document.addEventListener('DOMContentLoaded', highlightSearchTerms);
+
+        // Focus search box on Ctrl+F
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+        });
     </script>
 </body>
 </html>
