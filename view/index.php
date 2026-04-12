@@ -554,6 +554,199 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             filter: invert(1);
         }
 
+        /* Print styles - Always use light mode formatting */
+        @media print {
+            /* Force light mode colors and hide interactive elements */
+            body, body.dark {
+                background: white !important;
+                color: black !important;
+                font-size: 12pt;
+                line-height: 1.4;
+                max-width: none;
+                margin: 0;
+                padding: 15pt;
+            }
+            
+            /* Links - make them visible in print */
+            a, body.dark a {
+                color: #000080 !important;
+                text-decoration: underline;
+            }
+            
+            /* Hide interactive elements */
+            .mermaid-modal,
+            .mermaid::after,
+            .mermaid-code-viewer,
+            .mermaid-modal-btn,
+            button {
+                display: none !important;
+            }
+            
+            /* Code styling for print */
+            code:not([class*="language-"]),
+            body.dark code:not([class*="language-"]) {
+                background: #f5f5f5 !important;
+                color: #000 !important;
+                border: 1px solid #ddd;
+                padding: 0.2em 0.4em;
+                border-radius: 3px;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                font-size: 10pt;
+            }
+            
+            /* Code blocks for print */
+            pre[class*="language-"] {
+                background: #f8f8f8 !important;
+                border: 1px solid #ddd !important;
+                page-break-inside: avoid;
+                margin: 12pt 0;
+                padding: 8pt !important;
+                border-radius: 4px;
+                overflow: visible !important;
+            }
+            
+            pre code[class*="language-"] {
+                color: #000 !important;
+                background: transparent !important;
+                font-size: 9pt;
+                line-height: 1.3;
+                white-space: pre-wrap !important;
+                word-wrap: break-word;
+            }
+            
+            /* Blockquotes for print */
+            blockquote {
+                border-left: 4pt solid #666 !important;
+                background: #f9f9f9 !important;
+                color: #000 !important;
+                page-break-inside: avoid;
+                margin: 12pt 0;
+                padding: 8pt 12pt;
+            }
+            
+            /* Tables for print */
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 10pt;
+                page-break-inside: avoid;
+                margin: 12pt 0;
+            }
+            
+            th, td {
+                border: 1pt solid #666 !important;
+                padding: 4pt 6pt;
+                text-align: left;
+            }
+            
+            thead th,
+            body.dark thead th {
+                background: #e9e9e9 !important;
+                color: #000 !important;
+                font-weight: bold;
+            }
+            
+            /* Headings for print */
+            h1, h2, h3, h4, h5, h6 {
+                color: #000 !important;
+                page-break-after: avoid;
+                margin-top: 18pt;
+                margin-bottom: 8pt;
+            }
+            
+            h1 { font-size: 18pt; }
+            h2 { font-size: 16pt; }
+            h3 { font-size: 14pt; }
+            h4 { font-size: 12pt; }
+            h5 { font-size: 11pt; }
+            h6 { font-size: 10pt; }
+            
+            /* Lists for print */
+            ul, ol {
+                margin: 8pt 0;
+                padding-left: 20pt;
+            }
+            
+            li {
+                margin: 2pt 0;
+                page-break-inside: avoid;
+            }
+            
+            /* Checkboxes for print - show as text symbols */
+            input[type=checkbox].interactive-checkbox {
+                display: none;
+            }
+            
+            input[type=checkbox].interactive-checkbox::after,
+            input[type=checkbox].interactive-checkbox + * {
+                position: relative;
+            }
+            
+            input[type=checkbox].interactive-checkbox:not(:checked) + *::before {
+                content: "☐ ";
+                font-weight: bold;
+            }
+            
+            input[type=checkbox].interactive-checkbox:checked + *::before {
+                content: "☑ ";
+                font-weight: bold;
+            }
+            
+            /* Remove strikethrough and opacity from checked items in print */
+            li:has(input[type=checkbox].interactive-checkbox:checked),
+            li.checkbox-checked,
+            body.dark li:has(input[type=checkbox].interactive-checkbox:checked),
+            body.dark li.checkbox-checked {
+                color: #000 !important;
+                text-decoration: none !important;
+                opacity: 1 !important;
+            }
+            
+            /* Mermaid diagrams for print */
+            .mermaid {
+                page-break-inside: avoid;
+                margin: 12pt 0;
+                text-align: center;
+            }
+            
+            .mermaid svg {
+                max-width: 100% !important;
+                height: auto !important;
+                background: white !important;
+            }
+            
+            /* SVG handling for print - always show original colors */
+            .svg-invertible,
+            body.dark .svg-invertible.svg-invert-white,
+            body.light .svg-invertible.svg-invert-black {
+                filter: none !important;
+            }
+            
+            /* Page breaks */
+            .page-break {
+                page-break-before: always;
+            }
+            
+            /* Avoid orphans and widows */
+            p {
+                orphans: 3;
+                widows: 3;
+            }
+            
+            /* Images for print */
+            img {
+                max-width: 100%;
+                page-break-inside: avoid;
+                margin: 8pt 0;
+            }
+            
+            /* Remove transitions and animations */
+            *, *::before, *::after {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
+
     </style>
 </head>
 <body class="<?= $darkClass ?>">  
