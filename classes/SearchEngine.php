@@ -27,7 +27,7 @@ class SearchEngine {
         
         foreach ($files as $file) {
             $content = file_get_contents($file['path']);
-            $metadata = $this->extractMetadata($content);
+            $metadata = $this->fileManager->parseFrontmatter($content);
             $plainContent = $this->stripFrontmatter($content);
             
             $score = $this->calculateScore($parsedQuery, $file, $metadata, $plainContent);
@@ -64,8 +64,8 @@ class SearchEngine {
             $query = str_replace($matches[0], '', $query);
         }
         
-        // Handle special operators
-        $tokens = explode(' ', $query);
+        // Handle special operators (collapse whitespace)
+        $tokens = preg_split('/\s+/', $query, -1, PREG_SPLIT_NO_EMPTY);
         
         foreach ($tokens as $token) {
             $token = trim($token);
@@ -90,22 +90,64 @@ class SearchEngine {
         return $parsed;
     }
     
+    private function strLower($s) {
+        if ($s === null || $s === '') {
+            return '';
+        }
+        return function_exists('mb_strtolower') ? mb_strtolower((string) $s, 'UTF-8') : strtolower((string) $s);
+    }
+    
+    private function strPos($haystack, $needle, $offset = 0) {
+        if ($needle === '') {
+            return false;
+        }
+        // Byte offsets only (matches strlen/substr on UTF-8 strings)
+        return strpos($haystack, $needle, $offset);
+    }
+    
+    private function strContains($haystack, $needle) {
+        return $this->strPos($haystack, $needle) !== false;
+    }
+    
+    private function substrCountUnicode($haystack, $needle) {
+        if ($needle === '') {
+            return 0;
+        }
+        if (function_exists('mb_substr_count')) {
+            return mb_substr_count($haystack, $needle, 'UTF-8');
+        }
+        return substr_count($haystack, $needle);
+    }
+    
+    private function normalizeTags($tags) {
+        if ($tags === null || $tags === '') {
+            return [];
+        }
+        if (is_array($tags)) {
+            return $tags;
+        }
+        return [$tags];
+    }
+    
     private function calculateScore($parsedQuery, $file, $metadata, $content) {
         $score = 0;
         $title = $file['display_name'];
-        $contentLower = strtolower($content);
-        $titleLower = strtolower($title);
+        $contentLower = $this->strLower($content);
+        $titleLower = $this->strLower($title);
         
         // Tag filtering
         if (!empty($parsedQuery['tags'])) {
-            $fileTags = $metadata['tags'] ?? [];
+            $fileTags = $this->normalizeTags($metadata['tags'] ?? []);
             $hasRequiredTag = false;
             
             foreach ($parsedQuery['tags'] as $requiredTag) {
-                if (in_array(strtolower($requiredTag), array_map('strtolower', $fileTags))) {
-                    $hasRequiredTag = true;
-                    $score += 50; // Bonus for tag match
-                    break;
+                $reqLower = $this->strLower($requiredTag);
+                foreach ($fileTags as $ft) {
+                    if ($this->strLower($ft) === $reqLower) {
+                        $hasRequiredTag = true;
+                        $score += 50; // Bonus for tag match
+                        break 2;
+                    }
                 }
             }
             
@@ -116,18 +158,18 @@ class SearchEngine {
         
         // Exclude terms
         foreach ($parsedQuery['exclude'] as $excludeTerm) {
-            if (strpos($contentLower, strtolower($excludeTerm)) !== false) {
+            if ($this->strContains($contentLower, $this->strLower($excludeTerm))) {
                 return 0; // Exclude this file
             }
         }
         
         // Exact phrase matching
         if ($parsedQuery['exact_phrase']) {
-            $phrase = strtolower($parsedQuery['exact_phrase']);
-            if (strpos($contentLower, $phrase) !== false) {
+            $phrase = $this->strLower($parsedQuery['exact_phrase']);
+            if ($this->strContains($contentLower, $phrase)) {
                 $score += 100;
             }
-            if (strpos($titleLower, $phrase) !== false) {
+            if ($this->strContains($titleLower, $phrase)) {
                 $score += 200;
             }
         }
@@ -138,60 +180,59 @@ class SearchEngine {
         $totalTerms = count($parsedQuery['terms']);
         
         foreach ($parsedQuery['terms'] as $term) {
-            $termLower = strtolower($term);
+            $termLower = $this->strLower($term);
             $termMatched = false;
             
             if ($parsedQuery['title_only']) {
                 // Search only in title
-                if (strpos($titleLower, $termLower) !== false) {
+                if ($this->strContains($titleLower, $termLower)) {
                     $termMatchScore += 150;
                     $termMatched = true;
                 }
             } else {
                 // Title matches are highly weighted
-                if (strpos($titleLower, $termLower) !== false) {
-                    $titleMatches = substr_count($titleLower, $termLower);
+                if ($this->strContains($titleLower, $termLower)) {
+                    $titleMatches = $this->substrCountUnicode($titleLower, $termLower);
                     $termMatchScore += $titleMatches * 100;
                     $termMatched = true;
                 }
                 
                 // Content matches - search in full content
-                if (strpos($contentLower, $termLower) !== false) {
-                    $contentMatches = substr_count($contentLower, $termLower);
+                if ($this->strContains($contentLower, $termLower)) {
+                    $contentMatches = $this->substrCountUnicode($contentLower, $termLower);
                     $termMatchScore += $contentMatches * 10;
                     $termMatched = true;
                     
-                    // Bonus for word boundaries (exact word match)
-                    if (preg_match('/\b' . preg_quote($termLower, '/') . '\b/', $contentLower)) {
+                    // Bonus for word boundaries (Unicode-aware word match)
+                    if (preg_match('/\b' . preg_quote($termLower, '/') . '\b/iu', $content)) {
                         $termMatchScore += 20;
                     }
                 }
                 
                 // Bonus for matches in headings
-                if (preg_match('/^#{1,6}\s.*' . preg_quote($termLower, '/') . '/im', $content)) {
+                if (preg_match('/^#{1,6}\s.*' . preg_quote($termLower, '/') . '/imu', $content)) {
                     $termMatchScore += 30;
                 }
                 
                 // Check metadata fields (description, tags, etc.)
-                if (isset($metadata['description']) && 
-                    strpos(strtolower($metadata['description']), $termLower) !== false) {
+                if (isset($metadata['description']) && is_string($metadata['description']) &&
+                    $this->strContains($this->strLower($metadata['description']), $termLower)) {
                     $termMatchScore += 25;
                     $termMatched = true;
                 }
                 
                 // Search in tags
-                if (isset($metadata['tags']) && is_array($metadata['tags'])) {
-                    foreach ($metadata['tags'] as $tag) {
-                        if (strpos(strtolower($tag), $termLower) !== false) {
-                            $termMatchScore += 30;
-                            $termMatched = true;
-                            break;
-                        }
+                $metaTags = $this->normalizeTags($metadata['tags'] ?? []);
+                foreach ($metaTags as $tag) {
+                    if ($this->strContains($this->strLower($tag), $termLower)) {
+                        $termMatchScore += 30;
+                        $termMatched = true;
+                        break;
                     }
                 }
                 
                 // Search in code blocks (for technical terms)
-                if (preg_match('/```[\s\S]*?' . preg_quote($termLower, '/') . '[\s\S]*?```/i', $content)) {
+                if (preg_match('/```[\s\S]*?' . preg_quote($termLower, '/') . '[\s\S]*?```/iu', $content)) {
                     $termMatchScore += 15;
                     $termMatched = true;
                 }
@@ -202,8 +243,20 @@ class SearchEngine {
             }
         }
         
-        // Add to score if we found any term matches
-        // Allow partial matches - if at least one term matches, include the file
+        // All non-empty terms must match (AND), same expectation as most search UIs
+        if ($totalTerms > 0 && $matchedTerms < $totalTerms) {
+            return 0;
+        }
+        
+        // Quoted phrase must appear when user included quotes
+        if (!empty($parsedQuery['exact_phrase'])) {
+            $phraseNeedle = $this->strLower($parsedQuery['exact_phrase']);
+            if (!$this->strContains($contentLower, $phraseNeedle) && !$this->strContains($titleLower, $phraseNeedle)) {
+                return 0;
+            }
+        }
+        
+        // Add to score if we found any term matches (or there were no text terms)
         if ($termMatchScore > 0 || $matchedTerms > 0) {
             $score += $termMatchScore;
             
@@ -227,15 +280,15 @@ class SearchEngine {
     
     private function generateExcerpt($content, $terms, $length = 200) {
         $content = strip_tags($content);
-        $contentLower = strtolower($content);
+        $contentLower = $this->strLower($content);
         
         // Find the best position to start excerpt
         $bestPos = 0;
         $maxMatches = 0;
         
         foreach ($terms as $term) {
-            $termLower = strtolower($term);
-            $pos = strpos($contentLower, $termLower);
+            $termLower = $this->strLower($term);
+            $pos = $this->strPos($contentLower, $termLower);
             
             if ($pos !== false) {
                 // Count matches in a window around this position
@@ -245,7 +298,7 @@ class SearchEngine {
                 
                 $matches = 0;
                 foreach ($terms as $checkTerm) {
-                    $matches += substr_count($window, strtolower($checkTerm));
+                    $matches += $this->substrCountUnicode($window, $this->strLower($checkTerm));
                 }
                 
                 if ($matches > $maxMatches) {
@@ -271,14 +324,14 @@ class SearchEngine {
     
     private function getHighlights($content, $terms, $maxHighlights = 3) {
         $highlights = [];
-        $contentLower = strtolower($content);
+        $contentLower = $this->strLower($content);
         
         foreach ($terms as $term) {
-            $termLower = strtolower($term);
+            $termLower = $this->strLower($term);
             $pos = 0;
             $count = 0;
             
-            while (($pos = strpos($contentLower, $termLower, $pos)) !== false && $count < $maxHighlights) {
+            while (($pos = $this->strPos($contentLower, $termLower, $pos)) !== false && $count < $maxHighlights) {
                 $start = max(0, $pos - 30);
                 $length = min(60, strlen($content) - $start);
                 $highlight = substr($content, $start, $length);
@@ -292,48 +345,12 @@ class SearchEngine {
                 }
                 
                 $highlights[] = trim($highlight);
-                $pos += strlen($term);
+                $pos += strlen($termLower);
                 $count++;
             }
         }
         
         return array_unique($highlights);
-    }
-    
-    private function extractMetadata($content) {
-        $pattern = '/^---\s*\n(.*?)\n---\s*\n/s';
-        
-        if (preg_match($pattern, $content, $matches)) {
-            $frontmatter = $matches[1];
-            $metadata = [];
-            
-            $lines = explode("\n", $frontmatter);
-            foreach ($lines as $line) {
-                if (strpos($line, ':') !== false) {
-                    list($key, $value) = explode(':', $line, 2);
-                    $key = trim($key);
-                    $value = trim($value);
-                    
-                    // Parse arrays
-                    if (preg_match('/^\[(.*)\]$/', $value, $arrayMatches)) {
-                        $arrayItems = explode(',', $arrayMatches[1]);
-                        $value = array_map(function($item) {
-                            return trim($item, ' "\'');
-                        }, $arrayItems);
-                        $value = array_filter($value);
-                    } else {
-                        // Remove quotes
-                        $value = trim($value, '"\'');
-                    }
-                    
-                    $metadata[$key] = $value;
-                }
-            }
-            
-            return $metadata;
-        }
-        
-        return [];
     }
     
     private function stripFrontmatter($content) {
@@ -351,13 +368,13 @@ class SearchEngine {
         foreach ($files as $file) {
             $content = file_get_contents($file['path']);
             $content = $this->stripFrontmatter($content);
-            $content = strtolower(strip_tags($content));
+            $content = $this->strLower(strip_tags($content));
             
             // Extract words
-            preg_match_all('/\b\w{3,}\b/', $content, $matches);
+            preg_match_all('/\b\w{3,}\b/u', $content, $matches);
             
             foreach ($matches[0] as $word) {
-                if (strpos($word, strtolower($partialQuery)) === 0) {
+                if ($this->strPos($word, $this->strLower($partialQuery)) === 0) {
                     $wordFreq[$word] = ($wordFreq[$word] ?? 0) + 1;
                 }
             }
@@ -376,7 +393,7 @@ class SearchEngine {
         
         foreach ($files as $file) {
             $content = file_get_contents($file['path']);
-            $metadata = $this->extractMetadata($content);
+            $metadata = $this->fileManager->parseFrontmatter($content);
             
             // Add tags to popular searches
             if (isset($metadata['tags'])) {
@@ -386,7 +403,7 @@ class SearchEngine {
             }
             
             // Add title words
-            $titleWords = explode(' ', strtolower($file['display_name']));
+            $titleWords = preg_split('/\s+/', $this->strLower($file['display_name']), -1, PREG_SPLIT_NO_EMPTY);
             foreach ($titleWords as $word) {
                 if (strlen($word) > 3) {
                     $wordFreq[$word] = ($wordFreq[$word] ?? 0) + 2;

@@ -64,6 +64,47 @@ body {
     flex-wrap: wrap;
 }
 
+.header-search-cluster {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.quick-tag-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.quick-tag-btn {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    line-height: 1.3;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.quick-tag-btn:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+}
+
+.quick-tag-btn.active {
+    border-color: var(--accent-primary);
+    background: var(--accent-muted);
+    color: var(--accent-primary);
+}
+
 /* File Manager button styling */
 .header-actions a[href="filemanager/"] {
     background: linear-gradient(135deg, #f39c12, #e67e22);

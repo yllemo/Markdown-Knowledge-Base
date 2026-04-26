@@ -17,6 +17,8 @@ $config = [
     'backup_interval' => 86400, // 24 hours in seconds
     'max_backups' => 10,
     'current_knowledgebase' => '', // Current working knowledgebase (empty = root/all)
+    // Shown as quick buttons next to the search field on index.php (override in config.custom.php)
+    'quick_filter_tags' => ['top', 'prio', 'signal'],
 ];
 
 // Load custom config if exists

@@ -15,6 +15,7 @@ class KnowledgeBase {
         this.allFiles = [];
         this.allTags = {};
         this.currentBrowseType = '';
+        this.quickTagButtons = [];
         
         this.initializeElements();
         this.bindEvents();
@@ -234,8 +235,12 @@ class KnowledgeBase {
             this.markdownPreview.addEventListener('scroll', () => this.syncScroll('preview'));
         }
         
-        // Search
-        this.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+        // Search (sync quick-tag chips immediately; search is debounced inside handleSearch)
+        this.searchInput.addEventListener('input', (e) => {
+            this.syncQuickTagButtonsFromInput();
+            this.handleSearch(e.target.value);
+        });
+        this.bindQuickTagFilters();
         
         // Browse modal search
         if (this.browseSearch) {
@@ -1523,6 +1528,7 @@ Record how well the prompt works:
             this.searchInput.value = '';
             this.isSearchActive = false;
             this.clearSearchUI();
+            this.syncQuickTagButtonsFromInput();
             this.refreshFileList();
         }
     }
@@ -1907,18 +1913,25 @@ Record how well the prompt works:
                 // Clear search - reset to normal view
                 this.isSearchActive = false;
                 this.clearSearchUI();
+                this.syncQuickTagButtonsFromInput();
                 await this.refreshFileList();
                 return;
             }
 
             try {
                 const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
-                const results = await response.json();
-                
+                const payload = await response.json();
+                if (!response.ok || !Array.isArray(payload)) {
+                    console.error('Search failed:', !response.ok ? response.status : payload);
+                    this.isSearchActive = true;
+                    this.updateSearchUI();
+                    this.renderFileList([]);
+                    return;
+                }
                 // Set search state and update UI
                 this.isSearchActive = true;
                 this.updateSearchUI();
-                this.renderFileList(results);
+                this.renderFileList(payload);
             } catch (error) {
                 console.error('Search error:', error);
             }
@@ -1951,9 +1964,50 @@ Record how well the prompt works:
             
             // Update search input to show filter
             this.searchInput.value = `tag:${tagName}`;
+            this.syncQuickTagButtonsFromInput();
         } catch (error) {
             console.error('Tag filter error:', error);
         }
+    }
+
+    bindQuickTagFilters() {
+        this.quickTagButtons = document.querySelectorAll('.quick-tag-btn');
+        this.quickTagButtons.forEach((btn) => {
+            btn.setAttribute('aria-pressed', 'false');
+            btn.addEventListener('click', () => this.onQuickTagClick(btn));
+        });
+    }
+
+    syncQuickTagButtonsFromInput() {
+        if (!this.searchInput || !this.quickTagButtons || !this.quickTagButtons.length) {
+            return;
+        }
+        const q = this.searchInput.value.trim();
+        this.quickTagButtons.forEach((btn) => {
+            const t = btn.dataset.tag;
+            const on = Boolean(t && q === `tag:${t}`);
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    async onQuickTagClick(btn) {
+        if (!btn || !this.searchInput) {
+            return;
+        }
+        const tag = btn.dataset.tag;
+        if (!tag) {
+            return;
+        }
+        if (btn.classList.contains('active')) {
+            this.searchInput.value = '';
+            this.isSearchActive = false;
+            this.clearSearchUI();
+            await this.refreshFileList();
+            this.syncQuickTagButtonsFromInput();
+            return;
+        }
+        await this.filterByTag(tag);
     }
 
     handleKeyboard(e) {

@@ -58,15 +58,36 @@ $allTags = $tagManager->getAllTags();
                 </h1>
             </div>
             <div class="header-actions">
-                <input type="text" id="searchInput" placeholder="Search files..." class="search-input"
-                       autocomplete="new-password"
-                       data-form-type="other" 
+                <div class="header-search-cluster">
+                <?php
+                $quickTags = getConfig('quick_filter_tags', ['top', 'prio', 'signal']);
+                if (!is_array($quickTags)) {
+                    $quickTags = [];
+                }
+                $quickTags = array_values(array_filter($quickTags, function ($t) {
+                    return is_string($t) && $t !== '';
+                }));
+                if (!empty($quickTags)):
+                ?>
+                <div class="quick-tag-filters" role="toolbar" aria-label="Quick tag filters">
+                    <?php foreach ($quickTags as $qt): ?>
+                    <button type="button" class="quick-tag-btn" data-tag="<?= htmlspecialchars($qt, ENT_QUOTES, 'UTF-8') ?>" title="<?= htmlspecialchars('Files with tag: ' . $qt, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($qt, ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                <input type="search" id="searchInput" placeholder="Search files..." class="search-input"
+                       autocomplete="off"
+                       autocorrect="off"
+                       autocapitalize="none"
+                       spellcheck="false"
+                       data-form-type="search"
                        data-lpignore="true"
                        data-1p-ignore="true"
                        data-bwignore="true"
                        data-dashlane-ignore="true"
                        role="searchbox"
-                       name="search_input_field">
+                       name="kb_q">
+                </div>
                 <div class="new-file-dropdown">
                     <button id="newFileBtn" class="btn btn-primary btn-split-left">+<span class="btn-text"> New File</span></button>
                     <button id="newFileDropdownBtn" class="btn btn-primary btn-split-right" title="Choose template">
@@ -245,16 +266,18 @@ $allTags = $tagManager->getAllTags();
                 <h2 id="browseTitle">Browse All Files</h2>
                 <button class="close-modal" onclick="window.kb.closeBrowseModal()">✕</button>
             </div>
-            <input type="text" id="browseSearch" class="browse-search" placeholder="Search..."
+            <input type="search" id="browseSearch" class="browse-search" placeholder="Search..."
                    autocomplete="off"
-                   autocomplete="new-password"
-                   data-form-type="other" 
+                   autocorrect="off"
+                   autocapitalize="none"
+                   spellcheck="false"
+                   data-form-type="search"
                    data-lpignore="true"
                    data-1p-ignore="true"
                    data-bwignore="true"
                    data-dashlane-ignore="true"
                    role="searchbox"
-                   name="browse_search_field">
+                   name="kb_browse_q">
             <div id="browseList" class="browse-list">
                 <!-- Content will be populated by JavaScript -->
             </div>

@@ -26,6 +26,128 @@ if (!$filePath || !file_exists($filePath) || strpos($filePath, $contentDir) !== 
 require_once __DIR__ . '/Parsedown.php';
 require_once __DIR__ . '/ParsedownExtra.php';
 
+/**
+ * GFM task list items: Parsedown may emit <li><p>[x] …</p></li> (loose lists) or
+ * <li>[x]<ul>…</ul></li> (nested list). A single regex cannot cover both; use DOM.
+ */
+function kb_view_convert_task_checkboxes(string $html, string $filename): string
+{
+    $checkboxIndex = 0;
+
+    libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    $wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><div id="kb-view-md-root">' . $html . '</div></body></html>';
+    if (!@$dom->loadHTML($wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD)) {
+        libxml_clear_errors();
+        return preg_replace_callback(
+            '/<li>\s*(?:<p\b[^>]*>\s*)?\[([ xX])\]\s*(.*?)<\/li>/s',
+            function ($matches) use (&$checkboxIndex, $filename) {
+                $checked = strtolower($matches[1]) === 'x' ? 'checked' : '';
+                $checkboxId = 'checkbox-' . md5($filename) . '-' . $checkboxIndex++;
+                return '<li><input type="checkbox" class="interactive-checkbox" data-checkbox-id="' . $checkboxId . '" ' . $checked . '> ' . $matches[2] . '</li>';
+            },
+            $html
+        );
+    }
+    libxml_clear_errors();
+
+    $root = $dom->getElementById('kb-view-md-root');
+    $xpath = new DOMXPath($dom);
+    if (!$root instanceof DOMElement) {
+        $nodes = $xpath->query('//*[@id="kb-view-md-root"]');
+        $root = $nodes->length > 0 ? $nodes->item(0) : null;
+    }
+    if (!$root instanceof DOMElement) {
+        return $html;
+    }
+
+    /** @var DOMElement $li */
+    foreach ($xpath->query('.//li', $root) as $li) {
+        if (!$li instanceof DOMElement) {
+            continue;
+        }
+        // Already converted
+        foreach ($li->childNodes as $ch) {
+            if ($ch instanceof DOMElement && strtolower($ch->tagName) === 'input'
+                && strpos(' ' . $ch->getAttribute('class') . ' ', ' interactive-checkbox ') !== false) {
+                continue 2;
+            }
+        }
+
+        $target = null;
+        $mode = null; // 'p' or 'text'
+        foreach ($li->childNodes as $child) {
+            if ($child->nodeType === XML_TEXT_NODE) {
+                if (trim($child->textContent) === '') {
+                    continue;
+                }
+                $target = $child;
+                $mode = 'text';
+                break;
+            }
+            if ($child->nodeType === XML_ELEMENT_NODE) {
+                $tag = strtolower($child->tagName);
+                if ($tag === 'ul' || $tag === 'ol') {
+                    break;
+                }
+                if ($tag === 'p') {
+                    $target = $child;
+                    $mode = 'p';
+                    break;
+                }
+                break;
+            }
+        }
+
+        if ($target === null) {
+            continue;
+        }
+
+        $plain = $target->textContent;
+        if (!preg_match('/^\s*\[([ xX])\]\s*(.*)$/s', $plain, $m)) {
+            continue;
+        }
+
+        $checked = strtolower($m[1]) === 'x';
+        $rest = $m[2];
+        $checkboxId = 'checkbox-' . md5($filename) . '-' . $checkboxIndex++;
+
+        $input = $dom->createElement('input');
+        $input->setAttribute('type', 'checkbox');
+        $input->setAttribute('class', 'interactive-checkbox');
+        $input->setAttribute('data-checkbox-id', $checkboxId);
+        if ($checked) {
+            $input->setAttribute('checked', 'checked');
+        }
+
+        $li->insertBefore($input, $target);
+
+        if ($mode === 'p') {
+            while ($target->firstChild) {
+                $target->removeChild($target->firstChild);
+            }
+            if ($rest !== '' && trim($rest) !== '') {
+                $target->appendChild($dom->createTextNode($rest));
+            }
+            if (!$target->hasChildNodes() || trim($target->textContent) === '') {
+                $li->removeChild($target);
+            }
+        } else {
+            /** @var DOMText $target */
+            $target->nodeValue = ($rest !== '' && trim($rest) !== '') ? $rest : '';
+            if (trim($target->nodeValue) === '') {
+                $li->removeChild($target);
+            }
+        }
+    }
+
+    $out = '';
+    foreach ($root->childNodes as $child) {
+        $out .= $dom->saveHTML($child);
+    }
+    return $out;
+}
+
 $content = file_get_contents($filePath);
 
 // Remove YAML front matter
@@ -47,16 +169,7 @@ $html = preg_replace_callback(
     $html
 );
 // Convert Markdown checkboxes to real HTML checkboxes with unique IDs
-$checkboxIndex = 0;
-$html = preg_replace_callback(
-    '/<li>\s*\[([ xX])\]\s*(.*?)<\/li>/',
-    function ($matches) use (&$checkboxIndex, $filename) {
-        $checked = strtolower($matches[1]) === 'x' ? 'checked' : '';
-        $checkboxId = 'checkbox-' . md5($filename) . '-' . $checkboxIndex++;
-        return '<li><input type="checkbox" class="interactive-checkbox" data-checkbox-id="' . $checkboxId . '" ' . $checked . '> ' . $matches[2] . '</li>';
-    },
-    $html
-);
+$html = kb_view_convert_task_checkboxes($html, $filename);
 
 // Process SVG images with inversion hints
 $html = preg_replace_callback(
@@ -157,7 +270,7 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
         }
         
         .mermaid::after {
-            content: '🔍 Click to view fullscreen';
+            content: '🔍 Click to open diagram';
             position: absolute;
             bottom: -25px;
             left: 50%;
@@ -194,6 +307,10 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             align-items: center;
             padding: 2rem;
             box-sizing: border-box;
+        }
+        
+        .mermaid-modal.fullscreen {
+            padding: 0;
         }
         
         .mermaid-modal.show {
@@ -320,6 +437,11 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             overflow: hidden;
             position: relative;
             cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+            padding: 0.35rem;
         }
         
         .mermaid-modal.fullscreen .mermaid-modal-diagram:active {
@@ -327,15 +449,23 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
         }
         
         .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid {
-            position: absolute;
-            top: 0;
-            left: 0;
-            transform-origin: 0 0;
-            transition: transform 0.1s ease-out;
+            position: relative;
+            margin: 0;
+            flex-shrink: 0;
+            width: auto;
+            max-width: min(100%, 100vw);
+            max-height: 100%;
+            transform-origin: center center;
+            transition: transform 0.12s ease-out;
         }
         
         .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid svg {
             transform: none;
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
         }
         
         /* Code viewer */
@@ -424,6 +554,19 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             min-height: 0;
         }
         
+        .mermaid-modal.fullscreen .mermaid-modal-diagram-wrapper {
+            width: 100%;
+        }
+        
+        .mermaid-modal.fullscreen .mermaid-modal-diagram-wrapper > .mermaid {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
         .mermaid-modal-diagram {
             flex: 1;
             overflow: auto;
@@ -445,32 +588,6 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             max-width: 100%;
             width: 100%;
             height: auto;
-        }
-        
-        /* Fullscreen mode - make diagram larger */
-        .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid {
-            width: 100%;
-            max-width: 100%;
-        }
-        
-        .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid svg {
-            width: 100%;
-            max-width: 100%;
-            height: auto;
-            transform: scale(1.2);
-            transform-origin: center;
-        }
-        
-        @media (max-width: 1200px) {
-            .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid svg {
-                transform: scale(1.1);
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid svg {
-                transform: scale(1);
-            }
         }
         
         .mermaid-modal-diagram .mermaid::after {
@@ -960,6 +1077,9 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                     codeToggle.title = 'Hide Code';
                     codeToggle.setAttribute('aria-label', 'Hide Code');
                 }
+                if (modal.classList.contains('fullscreen')) {
+                    window.requestAnimationFrame(() => fitDiagramToView());
+                }
             }
             
             // Function to remove pan/zoom handlers
@@ -994,11 +1114,7 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 const svg = currentMermaidElement.querySelector('svg');
                 if (!svg) return;
                 
-                // Reset transform
-                currentX = 0;
-                currentY = 0;
-                scale = 1;
-                updateTransform();
+                // Do not reset scale/translate here — fitDiagramToView owns initial fit
                 
                 // Mouse wheel zoom
                 panZoomHandlers.wheel = function(e) {
@@ -1008,7 +1124,6 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                     const delta = e.deltaY > 0 ? 0.9 : 1.1;
                     const newScale = Math.max(0.5, Math.min(3, scale * delta));
                     
-                    // Zoom towards mouse position
                     const rect = modalDiagram.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
@@ -1050,22 +1165,80 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 document.addEventListener('mouseup', panZoomHandlers.mouseup);
             }
             
-            // Update transform for pan and zoom
             function updateTransform() {
-                if (currentMermaidElement) {
-                    currentMermaidElement.style.transform = `translate(${currentX}px, ${currentY}px) scale(${scale})`;
+                if (!currentMermaidElement) {
+                    return;
                 }
+                currentMermaidElement.style.transformOrigin = 'center center';
+                currentMermaidElement.style.transform = `translate(${currentX}px, ${currentY}px) scale(${scale})`;
+            }
+            
+            function fitDiagramToView() {
+                if (!currentMermaidElement || !modal.classList.contains('fullscreen')) {
+                    return;
+                }
+                const svg = currentMermaidElement.querySelector('svg');
+                if (!svg) {
+                    return;
+                }
+                const container = modalDiagram;
+                
+                currentMermaidElement.style.transform = '';
+                currentMermaidElement.style.transformOrigin = 'center center';
+                scale = 1;
+                currentX = 0;
+                currentY = 0;
+                void container.offsetHeight;
+                
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(() => {
+                        if (!currentMermaidElement || !modal.classList.contains('fullscreen')) {
+                            return;
+                        }
+                        const cw = container.clientWidth;
+                        const ch = container.clientHeight;
+                        if (cw < 16 || ch < 16) {
+                            window.setTimeout(fitDiagramToView, 80);
+                            return;
+                        }
+                        
+                        const mr = currentMermaidElement.getBoundingClientRect();
+                        let natW = mr.width;
+                        let natH = mr.height;
+                        if (natW < 4 || natH < 4) {
+                            const sr = svg.getBoundingClientRect();
+                            natW = Math.max(natW, sr.width);
+                            natH = Math.max(natH, sr.height);
+                        }
+                        if (natW < 4 || natH < 4) {
+                            window.setTimeout(fitDiagramToView, 80);
+                            return;
+                        }
+                        
+                        const pad = 16;
+                        const availW = Math.max(40, cw - pad * 2);
+                        const availH = Math.max(40, ch - pad * 2);
+                        let s = Math.min(availW / natW, availH / natH);
+                        s = Math.min(Math.max(s, 0.06), 12);
+                        
+                        scale = s;
+                        currentX = 0;
+                        currentY = 0;
+                        updateTransform();
+                    });
+                });
             }
             
             // Function to toggle fullscreen mode
             function toggleFullscreen() {
                 modal.classList.toggle('fullscreen');
                 const isFullscreen = modal.classList.contains('fullscreen');
-                fullscreenToggle.textContent = isFullscreen ? '⛶' : '⛶';
-                fullscreenToggle.title = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
-                fullscreenToggle.setAttribute('aria-label', isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen');
+                fullscreenToggle.textContent = '⛶';
+                fullscreenToggle.title = isFullscreen ? 'Windowed view' : 'Fullscreen';
+                fullscreenToggle.setAttribute('aria-label', isFullscreen ? 'Windowed view' : 'Fullscreen');
                 
                 if (isFullscreen) {
+                    fitDiagramToView();
                     setupPanZoom();
                 } else {
                     // Remove pan/zoom handlers when exiting fullscreen
@@ -1089,10 +1262,11 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 // Clear previous content
                 modalDiagramWrapper.innerHTML = '';
                 
-                // Reset fullscreen state when opening new diagram
-                modal.classList.remove('fullscreen');
+                // Open directly in fullscreen; toggle shrinks to windowed view
+                modal.classList.add('fullscreen');
                 fullscreenToggle.textContent = '⛶';
-                fullscreenToggle.title = 'Toggle Fullscreen';
+                fullscreenToggle.title = 'Windowed view';
+                fullscreenToggle.setAttribute('aria-label', 'Windowed view');
                 
                 // Clone the entire Mermaid element (including rendered SVG)
                 const clonedElement = mermaidElement.cloneNode(true);
@@ -1124,7 +1298,6 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 // Set the code content immediately
                 newCodeContent.textContent = currentMermaidCode;
                 
-                // Add elements to wrapper
                 modalDiagramWrapper.appendChild(clonedElement);
                 modalDiagramWrapper.appendChild(newCodeViewer);
                 
@@ -1134,13 +1307,14 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 codeToggle.title = 'Show Code';
                 codeToggle.setAttribute('aria-label', 'Show Code');
                 
-                // Show modal
+                // Show modal (already has .fullscreen from above)
                 modal.classList.add('show');
                 
-                // Reset pan/zoom
                 currentX = 0;
                 currentY = 0;
                 scale = 1;
+                fitDiagramToView();
+                setupPanZoom();
             }
             
             // Add click handlers to all Mermaid diagrams
@@ -1207,15 +1381,22 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             // Close on Escape key
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && modal.classList.contains('show')) {
-                    if (modal.classList.contains('fullscreen')) {
-                        // First exit fullscreen
-                        toggleFullscreen();
-                    } else {
-                        // Then close modal
-                        closeModal();
-                    }
+                    e.preventDefault();
+                    closeModal();
                 }
             });
+            
+            if (typeof ResizeObserver !== 'undefined') {
+                let fitDebounceTimer = null;
+                const diagramResizeObserver = new ResizeObserver(function() {
+                    if (!modal.classList.contains('show') || !modal.classList.contains('fullscreen')) {
+                        return;
+                    }
+                    clearTimeout(fitDebounceTimer);
+                    fitDebounceTimer = setTimeout(fitDiagramToView, 80);
+                });
+                diagramResizeObserver.observe(modalDiagram);
+            }
         }
     </script>
     

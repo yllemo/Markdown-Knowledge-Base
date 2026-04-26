@@ -510,7 +510,7 @@ class FileManager {
         return substr($content, 0, $length) . '...';
     }
     
-    private function parseFrontmatter($content) {
+    public function parseFrontmatter($content) {
         $pattern = '/^---\s*\n(.*?)\n---\s*\n/s';
         
         if (preg_match($pattern, $content, $matches)) {

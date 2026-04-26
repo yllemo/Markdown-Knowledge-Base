@@ -124,7 +124,9 @@ MDKB features powerful full-text search that searches across:
 - **Headings** (section titles)
 
 **Search Features:**
-- **Partial Matching**: Files matching at least one search term are included
+- **Quick Tag Filters**: Configurable quick-access buttons for your most important tags (customizable in config)
+- **Strict Term Matching**: All search terms must match (AND logic) for more precise results
+- **Unicode Support**: Full UTF-8 support for international characters and symbols
 - **Relevance Scoring**: Results are ranked by relevance (more matches = higher rank)
 - **Smart Filtering**: Use operators like `tag:`, `title:`, `-` (exclude), and quoted phrases
 - **No Password Manager Interference**: Search fields are properly configured to prevent password manager popups
@@ -153,8 +155,9 @@ graph TD
 **Mermaid Features:**
 - **Latest Version**: Powered by Mermaid v11 with full icon support
 - **Icon Packs**: Use icons from Font Awesome, Material Design Icons, Logos, Simple Icons, and Material Symbols
-- **Fullscreen Viewing**: Click any diagram to open it in a fullscreen popup
-- **Pan & Zoom**: In fullscreen mode, drag to pan and scroll to zoom (0.5x - 3x)
+- **Intelligent Fullscreen**: Click any diagram to open it in fullscreen with automatic fit-to-view
+- **Enhanced Pan & Zoom**: Smooth mouse wheel zooming (0.5x - 3x) with drag-to-pan functionality
+- **Auto-Fit**: Diagrams automatically scale to fit the viewport when opened in fullscreen
 - **Code Viewing**: View and copy the original Mermaid code with one click
 - **Dark/Light Mode**: Diagrams automatically adapt to your theme
 
@@ -170,6 +173,7 @@ Transform markdown task lists into interactive checkboxes with persistent state:
 ```
 
 **Checkbox Features:**
+- **Advanced Parsing**: DOM-based processing handles nested lists and loose list formatting correctly
 - **Persistent State**: Checkbox status is saved in your browser (localStorage)
 - **Visual Feedback**: Completed tasks are shown with strikethrough and muted colors
 - **Works Everywhere**: Interactive in both editor and standalone viewer
@@ -234,6 +238,7 @@ Share a markdown file for collaborative review with inline commenting:
 ## Configuration
 - All settings are in `config.php` (or override in `config.custom.php`).
 - Change password, session timeout, file size/type, and more.
+- **Quick Tag Filters**: Customize which tags appear as quick-access buttons by setting `'quick_filter_tags'` array in your config
 
 ### Customization
 - **Favicon**: Upload a custom favicon (JPG, PNG, GIF, SVG, ICO) in Settings → Appearance
