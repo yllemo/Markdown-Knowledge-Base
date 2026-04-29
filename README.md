@@ -31,9 +31,10 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 
 - **Developers**: Technical documentation, code snippets, and project notes
 - **Writers**: Research notes, drafts, and reference materials
-- **Teams**: Collaborative documentation without expensive enterprise tools
+- **Teams**: Advanced collaborative documentation with comment export and resolution tracking
+- **Project Managers**: Documentation review workflows with comment statistics and mass actions
 - **Students**: Course notes, research, and study materials
-- **Professionals**: Meeting notes, procedures, and knowledge sharing
+- **Professionals**: Meeting notes, procedures, and knowledge sharing with team collaboration
 
 ## Key Features
 - Secure login with cookie-based authentication
@@ -54,7 +55,15 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
   - Full-text search across all content
 - **Standalone Markdown Viewer** - Direct viewing of .md files with themes and interactive features
 - **Monaco Editor** - In-browser markdown code editor (VS Code engine) with download support
-- **Collaboration View** - Comment on any block of content with a slide-in panel and persistent storage
+- **Collaboration System** - Professional team collaboration features:
+  - **Block-level Comments**: Comment on any paragraph, heading, list, or diagram
+  - **Real-time Statistics**: Live comment counts and resolution status
+  - **Comment Export**: Download all comments as `comments_YYYY-MM-DD.txt` files
+  - **Smart Filtering**: Filter comments by All/Open/Resolved status
+  - **Mass Actions**: Resolve all comments with one click for project completion
+  - **Persistent Storage**: Comments saved as JSON files with file locking
+  - **Author Management**: Named authors with localStorage persistence
+  - **Professional UI**: Slide-in panel with toolbar and responsive design
 
 ## Quick Start
 
@@ -229,9 +238,22 @@ Share a markdown file for collaborative review with inline commenting:
 
 **Collaboration Features:**
 - **Block-level commenting**: Hover over any heading, paragraph, list, or code block to reveal a comment button
-- **Slide-in comment panel**: View, add, resolve, and delete comments per block
-- **Persistent comments**: Comments are stored server-side via the comments API (`/api/comments.php`)
-- **Named authors**: Set your display name (saved in localStorage) for comment attribution
+- **Professional comment panel**: Feature-rich slide-in panel with statistics and action toolbar
+- **Real-time statistics**: Live display of total, open, and resolved comment counts
+- **Comment export**: Download all comments in two ways:
+  - **Client-side export**: JavaScript-generated `comments_YYYY-MM-DD.txt` file
+  - **Server-side export**: PHP API endpoint for consistent formatting
+- **Smart filtering**: Filter comments by All/Open/Resolved status with tab interface
+- **Mass actions**: 
+  - "Resolve All" - Mark all open comments as resolved with confirmation
+  - Bulk comment management for project completion workflows
+- **Enhanced UI**:
+  - Statistics toolbar showing comment distribution
+  - Professional filter tabs for better organization
+  - Responsive design supporting both dark and light themes
+- **Persistent storage**: Comments stored server-side via JSON with file locking for data integrity
+- **Named authors**: Set display name (localStorage) with click-to-change functionality
+- **Export format**: Comments grouped by content blocks with timestamps and resolution status
 - **Rendered markdown view**: Full Parsedown rendering with Mermaid diagrams, syntax highlighting, and SVG inversion
 - **Read-only checkboxes**: Task lists are displayed but not interactive in collaboration mode
 
