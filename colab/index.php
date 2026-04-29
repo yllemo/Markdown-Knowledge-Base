@@ -294,6 +294,55 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
             align-items: center;
             flex-shrink: 0;
         }
+        
+        .comment-panel-toolbar {
+            padding: 0.6rem 1.2rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            background: rgba(0,0,0,0.02);
+        }
+        body.dark .comment-panel-toolbar {
+            border-bottom-color: #333;
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .comment-stats {
+            font-size: 0.75rem;
+            color: #888;
+        }
+        
+        .comment-actions-toolbar {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .toolbar-btn {
+            background: none;
+            border: 1px solid #ddd;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.15s;
+        }
+        .toolbar-btn:hover {
+            background: #0077cc;
+            color: #fff;
+            border-color: #0077cc;
+        }
+        body.dark .toolbar-btn {
+            border-color: #444;
+            color: #aaa;
+        }
+        body.dark .toolbar-btn:hover {
+            background: #66aaff;
+            color: #111;
+            border-color: #66aaff;
+        }
         body.dark .comment-panel-header { border-bottom-color: #333; }
 
         .comment-panel-header h3 {
@@ -385,6 +434,47 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
             text-align: center;
             color: #999;
             font-size: 0.9rem;
+        }
+        
+        .comment-filter {
+            padding: 0.4rem 1.2rem;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0;
+        }
+        body.dark .comment-filter {
+            border-bottom-color: #333;
+        }
+        
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .filter-tab {
+            background: none;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            border-radius: 4px;
+            color: #888;
+            transition: all 0.15s;
+        }
+        .filter-tab.active {
+            background: #0077cc;
+            color: #fff;
+        }
+        body.dark .filter-tab.active {
+            background: #66aaff;
+            color: #111;
+        }
+        .filter-tab:hover:not(.active) {
+            background: rgba(0,119,204,0.1);
+            color: #0077cc;
+        }
+        body.dark .filter-tab:hover:not(.active) {
+            background: rgba(102,170,255,0.1);
+            color: #66aaff;
         }
 
         .comment-panel-form {
@@ -564,6 +654,21 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
             <h3 id="commentPanelTitle">Comments</h3>
             <button class="comment-panel-close" id="commentPanelClose" title="Close">&times;</button>
         </div>
+        <div class="comment-panel-toolbar">
+            <div class="comment-stats" id="commentStats">0 comments</div>
+            <div class="comment-actions-toolbar">
+                <button class="toolbar-btn" id="exportComments" title="Export all comments to text file (Client)">📥 Export</button>
+                <button class="toolbar-btn" id="exportCommentsServer" title="Export all comments via server download">📥 Server</button>
+                <button class="toolbar-btn" id="resolveAll" title="Mark all comments as resolved">✓ Resolve All</button>
+            </div>
+        </div>
+        <div class="comment-filter">
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all">All</button>
+                <button class="filter-tab" data-filter="unresolved">Open</button>
+                <button class="filter-tab" data-filter="resolved">Resolved</button>
+            </div>
+        </div>
         <div class="comment-panel-blocktext" id="commentPanelBlockText"></div>
         <div class="comment-panel-list" id="commentPanelList"></div>
         <div class="comment-panel-form">
@@ -713,6 +818,7 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
                 const data = await resp.json();
                 allComments = data.comments || [];
                 updateAllBadges();
+                updateCommentStats();
             } catch (e) {
                 console.error('Failed to fetch comments:', e);
             }
@@ -926,6 +1032,199 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
                 commentSubmit.disabled = false;
             }
         }
+
+        // ---- New features: Export, Statistics, Filtering ----
+        let currentFilter = 'all';
+        
+        function updateCommentStats() {
+            const total = allComments.length;
+            const resolved = allComments.filter(c => c.resolved).length;
+            const unresolved = total - resolved;
+            const statsEl = document.getElementById('commentStats');
+            if (total === 0) {
+                statsEl.textContent = 'No comments';
+            } else if (total === 1) {
+                statsEl.textContent = '1 comment';
+            } else {
+                statsEl.textContent = `${total} comments (${unresolved} open, ${resolved} resolved)`;
+            }
+        }
+        
+        function exportCommentsToFile() {
+            if (allComments.length === 0) {
+                alert('No comments to export.');
+                return;
+            }
+            
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + 
+                            String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(now.getDate()).padStart(2, '0');
+            const filename = `comments_${dateStr}.txt`;
+            
+            let content = `Comments Export - ${FILE}\n`;
+            content += `Generated: ${now.toLocaleString()}\n`;
+            content += `Total comments: ${allComments.length}\n`;
+            content += '='.repeat(50) + '\n\n';
+            
+            // Group comments by block
+            const commentsByBlock = {};
+            allComments.forEach(c => {
+                if (!commentsByBlock[c.block_id]) {
+                    commentsByBlock[c.block_id] = [];
+                }
+                commentsByBlock[c.block_id].push(c);
+            });
+            
+            Object.keys(commentsByBlock).forEach(blockId => {
+                const blockEl = document.querySelector(`[data-block-id="${blockId}"]`);
+                const blockText = blockEl ? blockEl.textContent.trim().substring(0, 100) : `Block: ${blockId}`;
+                
+                content += `📄 ${blockText}${blockText.length >= 100 ? '...' : ''}\n`;
+                content += '-'.repeat(30) + '\n';
+                
+                commentsByBlock[blockId].forEach(comment => {
+                    const status = comment.resolved ? '[RESOLVED]' : '[OPEN]';
+                    const date = new Date(comment.created).toLocaleString();
+                    content += `${status} ${comment.author} (${date}):\n`;
+                    content += `${comment.text}\n\n`;
+                });
+                
+                content += '\n';
+            });
+            
+            // Create and download file
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function exportCommentsViaServer() {
+            if (allComments.length === 0) {
+                alert('No comments to export.');
+                return;
+            }
+            
+            const url = '../api/export-comments.php?file=' + encodeURIComponent(FILE) + '&format=txt';
+            window.open(url, '_blank');
+        }
+        
+        async function resolveAllComments() {
+            const unresolvedComments = allComments.filter(c => !c.resolved);
+            if (unresolvedComments.length === 0) {
+                alert('No unresolved comments to mark as resolved.');
+                return;
+            }
+            
+            if (!confirm(`Mark all ${unresolvedComments.length} unresolved comments as resolved?`)) {
+                return;
+            }
+            
+            try {
+                for (const comment of unresolvedComments) {
+                    await resolveComment(comment.id);
+                }
+                if (currentBlockId) {
+                    renderPanelComments(currentBlockId);
+                }
+                updateAllBadges();
+                updateCommentStats();
+            } catch (e) {
+                console.error('Failed to resolve all comments:', e);
+                alert('Failed to resolve all comments. Please try again.');
+            }
+        }
+        
+        function applyCommentFilter(filter) {
+            currentFilter = filter;
+            
+            // Update filter tabs
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            
+            // If panel is open, re-render with filter
+            if (currentBlockId && panel.classList.contains('open')) {
+                renderFilteredPanelComments(currentBlockId, filter);
+            }
+        }
+        
+        function renderFilteredPanelComments(blockId, filter) {
+            let comments = getBlockComments(blockId);
+            
+            // Apply filter
+            if (filter === 'resolved') {
+                comments = comments.filter(c => c.resolved);
+            } else if (filter === 'unresolved') {
+                comments = comments.filter(c => !c.resolved);
+            }
+            
+            if (comments.length === 0) {
+                let emptyMessage = 'No comments yet. Be the first!';
+                if (filter === 'resolved') emptyMessage = 'No resolved comments.';
+                if (filter === 'unresolved') emptyMessage = 'No open comments.';
+                panelList.innerHTML = `<div class="comment-empty">${emptyMessage}</div>`;
+                return;
+            }
+            
+            panelList.innerHTML = '';
+            comments.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'comment-item' + (c.resolved ? ' resolved' : '');
+                item.innerHTML =
+                    '<div class="comment-item-header">' +
+                        '<span class="comment-author">' + decodeHtml(c.author) + '</span>' +
+                        '<span class="comment-date">' + formatDate(c.created) + '</span>' +
+                    '</div>' +
+                    '<div class="comment-text">' + decodeHtml(c.text) + '</div>' +
+                    '<div class="comment-actions">' +
+                        '<button class="comment-action-btn resolve-btn">' + (c.resolved ? 'Unresolve' : 'Resolve') + '</button>' +
+                        '<button class="comment-action-btn delete-btn">Delete</button>' +
+                    '</div>';
+
+                item.querySelector('.resolve-btn').addEventListener('click', async () => {
+                    try {
+                        await resolveComment(c.id);
+                        renderFilteredPanelComments(blockId, filter);
+                        updateAllBadges();
+                        updateCommentStats();
+                    } catch (e) { console.error(e); }
+                });
+                item.querySelector('.delete-btn').addEventListener('click', async () => {
+                    if (!confirm('Delete this comment?')) return;
+                    try {
+                        await deleteComment(c.id);
+                        renderFilteredPanelComments(blockId, filter);
+                        updateAllBadges();
+                        updateCommentStats();
+                    } catch (e) { console.error(e); }
+                });
+                panelList.appendChild(item);
+            });
+        }
+        
+        // Updated renderPanelComments to use filter
+        function renderPanelComments(blockId) {
+            updateCommentStats();
+            renderFilteredPanelComments(blockId, currentFilter);
+        }
+        
+        // Event listeners for new features
+        document.getElementById('exportComments').addEventListener('click', exportCommentsToFile);
+        document.getElementById('exportCommentsServer').addEventListener('click', exportCommentsViaServer);
+        document.getElementById('resolveAll').addEventListener('click', resolveAllComments);
+        
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                applyCommentFilter(tab.dataset.filter);
+            });
+        });
 
         // ---- Init ----
         updateAuthorDisplay();
