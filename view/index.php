@@ -310,7 +310,7 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
         }
         
         .mermaid-modal.fullscreen {
-            padding: 0;
+            padding: clamp(0.5rem, 1.2vw, 1.25rem);
         }
         
         .mermaid-modal.show {
@@ -417,14 +417,28 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             color: #eee;
         }
         
-        /* Fullscreen mode */
+        /* Expanded popup mode (near fullscreen) */
         .mermaid-modal.fullscreen .mermaid-modal-content {
-            max-width: 100vw;
-            max-height: 100vh;
+            width: min(96vw, 1800px);
+            height: min(94vh, 1200px);
+            max-width: min(96vw, 1800px);
+            max-height: min(94vh, 1200px);
+            border-radius: 12px;
+            padding: 1rem 1.1rem;
+        }
+        
+        /* True fullscreen mode (triggered by fullscreen toggle button) */
+        .mermaid-modal.fullscreen.maximized {
+            padding: 0;
+        }
+        
+        .mermaid-modal.fullscreen.maximized .mermaid-modal-content {
             width: 100vw;
             height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
             border-radius: 0;
-            padding: 1rem;
+            padding: 0.9rem 1rem;
         }
         
         .mermaid-modal.fullscreen .mermaid-modal-header {
@@ -453,8 +467,8 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             margin: 0;
             flex-shrink: 0;
             width: auto;
-            max-width: min(100%, 100vw);
-            max-height: 100%;
+            max-width: none;
+            max-height: none;
             transform-origin: center center;
             transition: transform 0.12s ease-out;
         }
@@ -462,8 +476,8 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
         .mermaid-modal.fullscreen .mermaid-modal-diagram .mermaid svg {
             transform: none;
             display: block;
-            max-width: 100%;
-            max-height: 100%;
+            max-width: none;
+            max-height: none;
             width: auto;
             height: auto;
         }
@@ -900,9 +914,9 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     
-    <!-- Mermaid for diagrams - Latest version with icon support -->
+    <!-- Mermaid for diagrams - latest release with icon/beta support -->
     <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.esm.min.mjs';
         
         // Configure Prism theme based on dark/light mode
         const isDark = document.body.classList.contains('dark');
@@ -1007,6 +1021,8 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 mousemove: null,
                 mouseup: null
             };
+            let fitRetryTimer = null;
+            let fitRafHandle = null;
             
             // Function to copy code to clipboard
             async function copyCodeToClipboard() {
@@ -1078,12 +1094,20 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                     codeToggle.setAttribute('aria-label', 'Hide Code');
                 }
                 if (modal.classList.contains('fullscreen')) {
-                    window.requestAnimationFrame(() => fitDiagramToView());
+                    scheduleFit();
                 }
             }
             
             // Function to remove pan/zoom handlers
             function removePanZoomHandlers() {
+                if (fitRetryTimer) {
+                    clearTimeout(fitRetryTimer);
+                    fitRetryTimer = null;
+                }
+                if (fitRafHandle) {
+                    cancelAnimationFrame(fitRafHandle);
+                    fitRafHandle = null;
+                }
                 if (panZoomHandlers.wheel) {
                     modalDiagram.removeEventListener('wheel', panZoomHandlers.wheel);
                     panZoomHandlers.wheel = null;
@@ -1183,6 +1207,8 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 }
                 const container = modalDiagram;
                 
+                // Avoid visible stepping while auto-fitting.
+                currentMermaidElement.style.transition = 'none';
                 currentMermaidElement.style.transform = '';
                 currentMermaidElement.style.transformOrigin = 'center center';
                 scale = 1;
@@ -1190,68 +1216,102 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 currentY = 0;
                 void container.offsetHeight;
                 
-                window.requestAnimationFrame(() => {
-                    window.requestAnimationFrame(() => {
+                fitRafHandle = window.requestAnimationFrame(() => {
+                    fitRafHandle = window.requestAnimationFrame(() => {
                         if (!currentMermaidElement || !modal.classList.contains('fullscreen')) {
                             return;
                         }
+                        fitRafHandle = null;
                         const cw = container.clientWidth;
                         const ch = container.clientHeight;
                         if (cw < 16 || ch < 16) {
-                            window.setTimeout(fitDiagramToView, 80);
+                            fitRetryTimer = window.setTimeout(() => {
+                                fitRetryTimer = null;
+                                fitDiagramToView();
+                            }, 80);
                             return;
                         }
                         
-                        const mr = currentMermaidElement.getBoundingClientRect();
-                        let natW = mr.width;
-                        let natH = mr.height;
+                        // Prefer intrinsic SVG geometry when available.
+                        // This avoids under-zoom when CSS max-width has already shrunk the diagram.
+                        let natW = 0;
+                        let natH = 0;
+                        if (svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width > 0 && svg.viewBox.baseVal.height > 0) {
+                            natW = svg.viewBox.baseVal.width;
+                            natH = svg.viewBox.baseVal.height;
+                        }
+                        if (natW < 4 || natH < 4) {
+                            const mr = currentMermaidElement.getBoundingClientRect();
+                            natW = Math.max(natW, mr.width);
+                            natH = Math.max(natH, mr.height);
+                        }
                         if (natW < 4 || natH < 4) {
                             const sr = svg.getBoundingClientRect();
                             natW = Math.max(natW, sr.width);
                             natH = Math.max(natH, sr.height);
                         }
                         if (natW < 4 || natH < 4) {
-                            window.setTimeout(fitDiagramToView, 80);
+                            fitRetryTimer = window.setTimeout(() => {
+                                fitRetryTimer = null;
+                                fitDiagramToView();
+                            }, 80);
                             return;
                         }
                         
-                        const pad = 16;
+                        // Use almost no margin in maximized mode for highest possible zoom.
+                        const pad = modal.classList.contains('maximized') ? 2 : 8;
                         const availW = Math.max(40, cw - pad * 2);
                         const availH = Math.max(40, ch - pad * 2);
                         let s = Math.min(availW / natW, availH / natH);
-                        s = Math.min(Math.max(s, 0.06), 12);
+                        s = Math.min(Math.max(s, 0.06), 14);
                         
                         scale = s;
                         currentX = 0;
                         currentY = 0;
                         updateTransform();
+                        window.requestAnimationFrame(() => {
+                            if (currentMermaidElement) {
+                                currentMermaidElement.style.transition = '';
+                            }
+                        });
                     });
+                });
+            }
+            
+            function scheduleFit() {
+                if (!currentMermaidElement || !modal.classList.contains('fullscreen')) {
+                    return;
+                }
+                if (fitRetryTimer) {
+                    clearTimeout(fitRetryTimer);
+                    fitRetryTimer = null;
+                }
+                if (fitRafHandle) {
+                    cancelAnimationFrame(fitRafHandle);
+                    fitRafHandle = null;
+                }
+                fitRafHandle = window.requestAnimationFrame(() => {
+                    fitRafHandle = null;
+                    fitDiagramToView();
                 });
             }
             
             // Function to toggle fullscreen mode
             function toggleFullscreen() {
-                modal.classList.toggle('fullscreen');
-                const isFullscreen = modal.classList.contains('fullscreen');
-                fullscreenToggle.textContent = '⛶';
-                fullscreenToggle.title = isFullscreen ? 'Windowed view' : 'Fullscreen';
-                fullscreenToggle.setAttribute('aria-label', isFullscreen ? 'Windowed view' : 'Fullscreen');
-                
-                if (isFullscreen) {
-                    fitDiagramToView();
-                    setupPanZoom();
-                } else {
-                    // Remove pan/zoom handlers when exiting fullscreen
-                    removePanZoomHandlers();
-                    // Reset pan/zoom when exiting fullscreen
-                    if (currentMermaidElement) {
-                        currentMermaidElement.style.transform = '';
-                    }
-                    currentX = 0;
-                    currentY = 0;
-                    scale = 1;
-                    modalDiagram.style.cursor = '';
+                // Popup mode is always fullscreen=true. This toggle switches between:
+                // - expanded popup (default)
+                // - true fullscreen (maximized)
+                if (!modal.classList.contains('fullscreen')) {
+                    modal.classList.add('fullscreen');
                 }
+                modal.classList.toggle('maximized');
+                const isMaximized = modal.classList.contains('maximized');
+                fullscreenToggle.textContent = '⛶';
+                fullscreenToggle.title = isMaximized ? 'Back to popup size' : 'Use full screen';
+                fullscreenToggle.setAttribute('aria-label', isMaximized ? 'Back to popup size' : 'Use full screen');
+                
+                scheduleFit();
+                setupPanZoom();
             }
             
             // Function to open modal with a specific diagram
@@ -1264,9 +1324,10 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 
                 // Open directly in fullscreen; toggle shrinks to windowed view
                 modal.classList.add('fullscreen');
+                modal.classList.remove('maximized');
                 fullscreenToggle.textContent = '⛶';
-                fullscreenToggle.title = 'Windowed view';
-                fullscreenToggle.setAttribute('aria-label', 'Windowed view');
+                fullscreenToggle.title = 'Use full screen';
+                fullscreenToggle.setAttribute('aria-label', 'Use full screen');
                 
                 // Clone the entire Mermaid element (including rendered SVG)
                 const clonedElement = mermaidElement.cloneNode(true);
@@ -1313,7 +1374,7 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 currentX = 0;
                 currentY = 0;
                 scale = 1;
-                fitDiagramToView();
+                scheduleFit();
                 setupPanZoom();
             }
             
@@ -1332,9 +1393,10 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             function closeModal() {
                 modal.classList.remove('show');
                 modal.classList.remove('fullscreen');
+                modal.classList.remove('maximized');
                 modalDiagramWrapper.innerHTML = '';
                 fullscreenToggle.textContent = '⛶';
-                fullscreenToggle.title = 'Toggle Fullscreen';
+                fullscreenToggle.title = 'Expanded popup';
                 codeToggle.textContent = '📄';
                 codeToggle.title = 'Show Code';
                 codeToggle.setAttribute('aria-label', 'Show Code');
@@ -1393,7 +1455,7 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                         return;
                     }
                     clearTimeout(fitDebounceTimer);
-                    fitDebounceTimer = setTimeout(fitDiagramToView, 80);
+                    fitDebounceTimer = setTimeout(scheduleFit, 80);
                 });
                 diagramResizeObserver.observe(modalDiagram);
             }
