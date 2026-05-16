@@ -50,6 +50,8 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 - **Advanced Markdown Support:**
   - Syntax highlighting with Prism.js (supports 200+ languages)
   - Mermaid v11 diagrams with icon support and fullscreen viewing
+  - **BPMN.io** process diagrams (`bpmnio` fenced blocks) with inline viewer and editor
+  - **draw.io** diagrams (`drawio` fenced blocks) with inline preview, editor, and SVG export
   - Interactive checkboxes from markdown task lists (with persistence)
   - SVG image inversion for dark/light mode compatibility
   - Full-text search across all content
@@ -172,6 +174,66 @@ graph TD
 
 **Icon Syntax**: Use `:pack:icon-name` format (e.g., `:fa:user`, `:mdi:github`, `:logos:javascript`)
 
+#### BPMN.io Diagrams
+Embed BPMN 2.0 process models directly in your markdown using a `bpmnio` code fence with BPMN XML inside:
+
+````markdown
+```bpmnio
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" ...>
+  <!-- BPMN 2.0 XML -->
+</bpmn:definitions>
+```
+````
+
+**BPMN Features:**
+- **Inline viewer**: Diagrams render in the standalone viewer (`/view/`) with pan/zoom (bpmn-js navigated viewer)
+- **Toolbar**: Fit, SVG download, and Edit
+- **Standalone editor**: Opens `view/bpmnio-editor.php` in a new window (full BPMN modeler)
+- **Apply to page**: Save changes back to the opener via `postMessage` (same origin)
+- **Browser persistence**: Edits are stored in `localStorage` until you copy the updated markdown fence into your `.md` file
+- **Dark/light mode**: Follows the viewer theme (`?style=light` or `?style=dark`)
+
+#### draw.io Diagrams
+Embed draw.io / diagrams.net diagrams using a `drawio` code fence with draw.io XML (`mxGraphModel` or full `mxfile`):
+
+````markdown
+```drawio
+<mxGraphModel>
+  <root>
+  ...
+  </root>
+</mxGraphModel>
+```
+````
+
+**draw.io Viewer Features:**
+- **Inline preview**: SVG when server export succeeds; otherwise an embedded read-only preview via `embed.diagrams.net`
+- **Toolbar**: Refresh preview, download SVG, and open the editor
+- **Click to edit**: Click the diagram block (outside toolbar buttons) to open the editor
+- **Dark/light mode**: Preview and editor respect `?style=light` or `?style=dark`
+
+**draw.io Editor** (`view/drawio-editor.php`):
+- **Fit**, **XML** panel, **Export** (`.drawio` XML), **SVG** download
+- **Apply to page** — sends updated XML (and SVG when available) back to the viewer
+- **Save & copy MD** — apply plus a markdown snippet to paste into your file
+- Keyboard shortcut: Ctrl/Cmd+S (Save & copy MD)
+
+**Persistence & caching:**
+- Edits are kept in `localStorage` until you save the fence into your `.md` file
+- Server-side SVG cache under `view/cache/drawio/` (gitignored) via `view/drawio-render.php`
+- Optional server export uses `convert.diagrams.net` (requires outbound HTTPS from your host); the viewer falls back to embed preview if export is unavailable
+
+**Related files:**
+| File | Purpose |
+|------|---------|
+| `view/js/bpmnio-viewer.js` | BPMN inline viewer |
+| `view/bpmnio-editor.php` | BPMN modeler window |
+| `view/js/drawio-viewer.js` | draw.io preview & toolbar |
+| `view/drawio-editor.php` | draw.io editor window |
+| `view/drawio-render.php` | Same-origin SVG render/cache API |
+| `view/drawio-lib.php` | XML normalization and export helpers |
+
 #### Interactive Checkboxes
 Transform markdown task lists into interactive checkboxes with persistent state:
 
@@ -210,6 +272,7 @@ View any markdown file directly with full interactive features:
 **Viewer Features:**
 - Interactive checkboxes with persistent state
 - Mermaid diagram fullscreen viewing with pan/zoom
+- BPMN.io and draw.io diagram blocks with editors (see above)
 - Code viewing and copying for Mermaid diagrams
 - Syntax highlighting for code blocks
 - Dark/light theme support

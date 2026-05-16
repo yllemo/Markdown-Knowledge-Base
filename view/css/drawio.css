@@ -1,0 +1,246 @@
+/* draw.io embedded blocks (view/index.php) */
+
+.drawio-block {
+    margin: 1.5em 0;
+    border: 1px solid var(--drawio-border, #d0c8e8);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--drawio-block-bg, #fff);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    position: relative;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.drawio-block:hover {
+    border-color: var(--drawio-border-hover, #5a3fa5);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+body.dark .drawio-block {
+    --drawio-border: #3d3352;
+    --drawio-border-hover: #a371f7;
+    --drawio-block-bg: #161b22;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.drawio-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 14px;
+    background: var(--drawio-toolbar-bg, #f4f0fb);
+    border-bottom: 1px solid var(--drawio-border, #d0c8e8);
+    gap: 10px;
+    cursor: default;
+}
+
+body.dark .drawio-toolbar {
+    --drawio-toolbar-bg: #1c1830;
+}
+
+.drawio-label {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--drawio-label, #5a3fa5);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+body.dark .drawio-label {
+    --drawio-label: #c4b5fd;
+}
+
+.drawio-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.drawio-action-btn {
+    font-family: system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--drawio-label, #5a3fa5);
+    background: transparent;
+    border: 1px solid var(--drawio-border, #d0c8e8);
+    border-radius: 4px;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.drawio-action-btn:hover {
+    background: var(--drawio-accent, #3d2c82);
+    color: #fff;
+    border-color: var(--drawio-accent, #3d2c82);
+}
+
+body.dark .drawio-action-btn:hover {
+    --drawio-accent: #a371f7;
+}
+
+.drawio-svg-wrap {
+    position: relative;
+    background: #fff;
+    padding: 16px;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.drawio-svg-wrap.drawio-svg-ready {
+    padding: 12px 16px 16px;
+    background: #fff;
+}
+
+.drawio-svg-wrap.drawio-svg-ready svg {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.drawio-svg-wrap.drawio-svg-missing {
+    padding: 20px 16px;
+    background: var(--drawio-toolbar-bg, #f4f0fb);
+}
+
+.drawio-svg-wrap.drawio-embed-mode {
+    padding: 0;
+    min-height: 280px;
+    background: #fff;
+}
+
+.drawio-preview-iframe {
+    display: block;
+    width: 100%;
+    min-height: 280px;
+    height: 320px;
+    border: 0;
+    pointer-events: none;
+}
+
+body.dark .drawio-svg-wrap.drawio-embed-mode {
+    background: #fff;
+}
+
+body.dark .drawio-svg-wrap.drawio-svg-ready {
+    background: #fff;
+}
+
+body.dark .drawio-svg-wrap.drawio-svg-missing {
+    background: var(--drawio-toolbar-bg, #1c1830);
+}
+
+.drawio-preview-fallback {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted, #666);
+    text-align: center;
+    line-height: 1.5;
+}
+
+body.dark .drawio-preview-fallback {
+    color: #8b949e;
+}
+
+.drawio-svg-wrap svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+template.drawio-xml-source {
+    display: none;
+}
+
+.drawio-loading {
+    color: #888;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    padding: 24px;
+}
+
+body.dark .drawio-loading {
+    color: #8b949e;
+}
+
+.drawio-block.drawio-error .drawio-svg-wrap {
+    padding: 16px;
+    color: #c0392b;
+    font-family: monospace;
+    font-size: 12px;
+    justify-content: flex-start;
+}
+
+body.dark .drawio-block.drawio-error .drawio-svg-wrap {
+    color: #f85149;
+}
+
+.drawio-block::after {
+    content: '✎ Klicka för att redigera';
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #888;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+body.dark .drawio-block::after {
+    color: #666;
+}
+
+.drawio-block:hover::after {
+    opacity: 1;
+}
+
+.drawio-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #3d2c82;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 10001;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    max-width: min(90vw, 480px);
+    text-align: center;
+}
+
+body.dark .drawio-toast {
+    background: #21262d;
+    border: 1px solid #3d3352;
+}
+
+.drawio-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+@media print {
+    .drawio-toolbar,
+    .drawio-block::after {
+        display: none !important;
+    }
+
+    .drawio-block {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+    }
+
+}

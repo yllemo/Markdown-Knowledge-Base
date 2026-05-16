@@ -1,0 +1,174 @@
+/* BPMN·IO embedded blocks (view/index.php) */
+
+.bpmnio-block {
+    margin: 1.5em 0;
+    border: 1px solid var(--bpmnio-border, #c8d4e8);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bpmnio-block-bg, #fff);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+    position: relative;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.bpmnio-block:hover {
+    border-color: var(--bpmnio-border-hover, #4a6fa5);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+body.dark .bpmnio-block {
+    --bpmnio-border: #30363d;
+    --bpmnio-border-hover: #58a6ff;
+    --bpmnio-block-bg: #161b22;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.bpmnio-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 14px;
+    background: var(--bpmnio-toolbar-bg, #f0f4fb);
+    border-bottom: 1px solid var(--bpmnio-border, #c8d4e8);
+    gap: 10px;
+    cursor: default;
+}
+
+body.dark .bpmnio-toolbar {
+    --bpmnio-toolbar-bg: #1c2128;
+}
+
+.bpmnio-label {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--bpmnio-label, #4a6fa5);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+body.dark .bpmnio-label {
+    --bpmnio-label: #79b8ff;
+}
+
+.bpmnio-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.bpmnio-action-btn {
+    font-family: system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--bpmnio-label, #4a6fa5);
+    background: transparent;
+    border: 1px solid var(--bpmnio-border, #c8d4e8);
+    border-radius: 4px;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.bpmnio-action-btn:hover {
+    background: var(--bpmnio-accent, #2c5282);
+    color: #fff;
+    border-color: var(--bpmnio-accent, #2c5282);
+}
+
+body.dark .bpmnio-action-btn:hover {
+    --bpmnio-accent: #58a6ff;
+}
+
+.bpmnio-canvas-wrap {
+    position: relative;
+    background: #fff;
+    min-height: 200px;
+}
+
+.bpmnio-canvas {
+    width: 100%;
+    height: 280px;
+}
+
+.bpmnio-block::after {
+    content: '✎ Click to edit diagram';
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: #888;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+body.dark .bpmnio-block::after {
+    color: #666;
+}
+
+.bpmnio-block:hover::after {
+    opacity: 1;
+}
+
+.bpmnio-block.bpmnio-error .bpmnio-canvas-wrap {
+    padding: 16px;
+    color: #c0392b;
+    font-family: monospace;
+    font-size: 12px;
+    background: #fff5f5;
+}
+
+body.dark .bpmnio-block.bpmnio-error .bpmnio-canvas-wrap {
+    background: #2d1515;
+    color: #f85149;
+}
+
+/* Snackbar after editor save */
+.bpmnio-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1a3a5c;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 10001;
+    opacity: 0;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    max-width: min(90vw, 480px);
+    text-align: center;
+}
+
+body.dark .bpmnio-toast {
+    background: #21262d;
+    border: 1px solid #30363d;
+}
+
+.bpmnio-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+@media print {
+    .bpmnio-toolbar,
+    .bpmnio-block::after {
+        display: none !important;
+    }
+
+    .bpmnio-block {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+    }
+
+    .bpmnio-canvas {
+        height: auto !important;
+        min-height: 180px;
+    }
+}

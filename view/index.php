@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // index.php - Markdown Viewer
 
 $filename = isset($_GET['file']) ? $_GET['file'] : '';
@@ -25,6 +25,7 @@ if (!$filePath || !file_exists($filePath) || strpos($filePath, $contentDir) !== 
 // Include Parsedown + ParsedownExtra
 require_once __DIR__ . '/Parsedown.php';
 require_once __DIR__ . '/ParsedownExtra.php';
+require_once __DIR__ . '/drawio-lib.php';
 
 /**
  * GFM task list items: Parsedown may emit <li><p>[x] …</p></li> (loose lists) or
@@ -168,6 +169,58 @@ $html = preg_replace_callback(
     },
     $html
 );
+
+// Convert ```bpmnio fenced blocks to interactive BPMN·IO viewers
+$bpmnioBlockIndex = 0;
+$html = preg_replace_callback(
+    '/<pre><code class="language-bpmnio">(.*?)<\/code><\/pre>/s',
+    function ($matches) use (&$bpmnioBlockIndex, $filename) {
+        $xml = trim(htmlspecialchars_decode($matches[1]));
+        $blockId = 'bpmnio-' . md5($filename) . '-' . ($bpmnioBlockIndex++);
+        $escapedXml = htmlspecialchars($xml, ENT_QUOTES, 'UTF-8');
+        $escapedId = htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8');
+
+        return '<div class="bpmnio-block" data-bpmnio-id="' . $escapedId . '" data-bpmn-xml="' . $escapedXml . '">'
+            . '<div class="bpmnio-toolbar">'
+            . '<span class="bpmnio-label">⬡ BPMN 2.0</span>'
+            . '<div class="bpmnio-actions">'
+            . '<button type="button" class="bpmnio-action-btn" data-action="fit">Fit</button>'
+            . '<button type="button" class="bpmnio-action-btn" data-action="svg">SVG</button>'
+            . '<button type="button" class="bpmnio-action-btn" data-action="edit">Edit</button>'
+            . '</div></div>'
+            . '<div class="bpmnio-canvas-wrap"><div class="bpmnio-canvas"></div></div>'
+            . '</div>';
+    },
+    $html
+);
+
+// Convert ```drawio fenced blocks to interactive draw.io viewers
+$drawioBlockIndex = 0;
+$html = preg_replace_callback(
+    '/<pre><code class="language-drawio">(.*?)<\/code><\/pre>/s',
+    function ($matches) use (&$drawioBlockIndex, $filename) {
+        $xml = trim(htmlspecialchars_decode($matches[1]));
+        $blockId = 'drawio-' . md5($filename) . '-' . ($drawioBlockIndex++);
+        $escapedId = htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8');
+        $contentHash = drawio_content_hash($xml);
+        $render = drawio_render_result($xml);
+
+        return '<div class="drawio-block" data-drawio-id="' . $escapedId . '"'
+            . ' data-drawio-hash="' . htmlspecialchars($contentHash, ENT_QUOTES, 'UTF-8') . '">'
+            . '<template class="drawio-xml-source">' . htmlspecialchars($xml, ENT_NOQUOTES, 'UTF-8') . '</template>'
+            . '<div class="drawio-toolbar">'
+            . '<span class="drawio-label">◈ draw.io</span>'
+            . '<div class="drawio-actions">'
+            . '<button type="button" class="drawio-action-btn" data-action="refresh" title="Ladda om förhandsvisning">Uppdatera</button>'
+            . '<button type="button" class="drawio-action-btn" data-action="svg">SVG</button>'
+            . '<button type="button" class="drawio-action-btn" data-action="edit" title="Öppna editor">Redigera</button>'
+            . '</div></div>'
+            . drawio_svg_wrap_html($render['svg'])
+            . '</div>';
+    },
+    $html
+);
+
 // Convert Markdown checkboxes to real HTML checkboxes with unique IDs
 $html = kb_view_convert_task_checkboxes($html, $filename);
 
@@ -205,6 +258,11 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?></title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="css/bpmnio.css">
+    <link rel="stylesheet" href="css/drawio.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17/dist/assets/diagram-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17/dist/assets/bpmn-js.css">
+    <link rel="stylesheet" href="https://unpkg.com/bpmn-js@17/dist/assets/bpmn-font/css/bpmn.css">
     
     <!-- Prism.js for syntax highlighting -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
@@ -845,6 +903,24 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
                 height: auto !important;
                 background: white !important;
             }
+
+            .bpmnio-block {
+                page-break-inside: avoid;
+            }
+
+            .bpmnio-canvas {
+                height: auto !important;
+                min-height: 200px;
+            }
+
+            .drawio-block {
+                page-break-inside: avoid;
+            }
+
+            .drawio-svg-wrap svg {
+                max-width: 100% !important;
+                height: auto !important;
+            }
             
             /* SVG handling for print - always show original colors */
             .svg-invertible,
@@ -1461,6 +1537,26 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             }
         }
     </script>
+
+    <!-- BPMN·IO diagram blocks -->
+    <script>
+        window.kbBpmnioConfig = {
+            filename: <?= json_encode($filename) ?>,
+            style: <?= json_encode($style) ?>
+        };
+    </script>
+    <script src="https://unpkg.com/bpmn-js@17/dist/bpmn-navigated-viewer.production.min.js"></script>
+    <script src="js/bpmnio-viewer.js"></script>
+
+    <!-- draw.io diagram blocks -->
+    <script>
+        window.kbDrawioConfig = {
+            filename: <?= json_encode($filename) ?>,
+            style: <?= json_encode($style) ?>,
+            renderUrl: 'drawio-render.php'
+        };
+    </script>
+    <script src="js/drawio-viewer.js"></script>
     
     <!-- Interactive Checkbox Handler -->
     <script>
