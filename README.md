@@ -56,7 +56,7 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
   - SVG image inversion for dark/light mode compatibility
   - Full-text search across all content
 - **Standalone Markdown Viewer** - Direct viewing of .md files with themes and interactive features
-- **Monaco Editor** - In-browser markdown code editor (VS Code engine) with download support
+- **Monaco Editor** — VS Code–style markdown editing in the main app (split preview), plus standalone `/edit` and `/admin` editors
 - **Collaboration System** - Professional team collaboration features:
   - **Block-level Comments**: Comment on any paragraph, heading, list, or diagram
   - **Real-time Statistics**: Live comment counts and resolution status
@@ -153,6 +153,18 @@ function hello() {
 }
 ```
 
+#### Plain Text Code Blocks (`text`)
+Use a `text` fence for preformatted content that should read like body text — no horizontal scrollbar, long lines wrap naturally:
+
+````markdown
+```text
+Long lines and paragraphs wrap on screen instead of scrolling sideways.
+Useful for notes, logs, or pasted content that is not source code.
+```
+````
+
+In `/view/`, `text` blocks (also `plaintext`, `plain`, `none`) use word-wrap and a subtle frame instead of a code-style scroll area.
+
 #### Mermaid Diagrams (v11 with Icon Support)
 Create flowcharts, sequence diagrams, and more using Mermaid v11 syntax with full icon support:
 
@@ -190,6 +202,8 @@ Embed BPMN 2.0 process models directly in your markdown using a `bpmnio` code fe
 - **Inline viewer**: Diagrams render in the standalone viewer (`/view/`) with pan/zoom (bpmn-js navigated viewer)
 - **Toolbar**: Fit, SVG download, and Edit
 - **Standalone editor**: Opens `view/bpmnio-editor.php` in a new window (full BPMN modeler)
+- **Editor toolbar**: Fit, XML panel, **Börja om** (reset to a minimal start→end diagram), Export (.bpmn), **SVG**, Apply to page, Save & copy MD
+- **Robust XML loading**: Invalid or empty XML falls back to a working default diagram; **Börja om** always resets to a valid template
 - **Apply to page**: Save changes back to the opener via `postMessage` (same origin)
 - **Browser persistence**: Edits are stored in `localStorage` until you copy the updated markdown fence into your `.md` file
 - **Dark/light mode**: Follows the viewer theme (`?style=light` or `?style=dark`)
@@ -214,7 +228,7 @@ Embed draw.io / diagrams.net diagrams using a `drawio` code fence with draw.io X
 - **Dark/light mode**: Preview and editor respect `?style=light` or `?style=dark`
 
 **draw.io Editor** (`view/drawio-editor.php`):
-- **Fit**, **XML** panel, **Export** (`.drawio` XML), **SVG** download
+- **Fit**, **XML** panel, **Börja om** (reset to an empty canvas), **Export** (`.drawio` XML), **SVG** download
 - **Apply to page** — sends updated XML (and SVG when available) back to the viewer
 - **Save & copy MD** — apply plus a markdown snippet to paste into your file
 - Keyboard shortcut: Ctrl/Cmd+S (Save & copy MD)
@@ -273,24 +287,36 @@ View any markdown file directly with full interactive features:
 - Interactive checkboxes with persistent state
 - Mermaid diagram fullscreen viewing with pan/zoom
 - BPMN.io and draw.io diagram blocks with editors (see above)
+- Plain `text` code blocks with word-wrap (no horizontal scrollbar)
 - Code viewing and copying for Mermaid diagrams
 - Syntax highlighting for code blocks
 - Dark/light theme support
 - Responsive design for all devices
 
 #### Markdown Editor (Monaco)
-Edit any markdown file in-browser using the Monaco Editor (the same engine that powers VS Code):
+MDKB uses the [Monaco Editor](https://microsoft.github.io/monaco-editor/) (the same engine as VS Code) in three places:
 
-**Usage:**
-- `/edit/?file=filename.md&style=dark` - Edit with dark theme
-- `/edit/?file=filename.md&style=light` - Edit with light theme
+| Where | URL / entry | Saves to server |
+|-------|-------------|-----------------|
+| **Main app** | Log in → open a file in the sidebar | Yes (Save button) |
+| **Standalone edit** | `/edit/?file=filename.md&style=dark` | No — download only |
+| **Admin edit** | `/admin/?file=…` (authenticated) | Per admin workflow |
 
-**Editor Features:**
+**Main app editor** (split view with live preview):
+- Monaco markdown editing with line numbers, minimap, and word wrap
+- **Smart lists** — Enter continues `-` / `*` / `+` bullet lists and numbered lists (`1.`, `2.`, …)
+- **Task lists** — Enter on `- [ ]` / `- [x]` lines continues with a new unchecked item
+- **IntelliSense** — Ctrl+Space for snippets: headings, links, tables, code fences, front matter, **Mermaid templates** (`mermaid`, `mermaid-sequence`, …), `drawio`, `bpmnio`
+- **Fullscreen** — F11 in the editor, or click the **📝 Editor** pane header
+- Live preview, tags, auto-save interval (Settings), and mobile editor/preview toggle
+
+**Standalone `/edit` and `/admin`:**
 - Full Monaco Editor with markdown syntax highlighting
-- Word wrap, minimap, and line numbers enabled by default
-- Dark/light theme support (`vs-dark` / `vs`)
+- Dark/light theme (`vs-dark` / `vs`)
 - Download edited content as `.md` file
-- In-memory only - no changes are saved to the server
+- In-memory only in `/edit` — changes are not written to the server unless you save elsewhere
+
+**Implementation:** `assets/js/monaco-markdown.js` (main app adapter), Monaco 0.52.2 via jsDelivr CDN
 
 #### Collaboration View
 Share a markdown file for collaborative review with inline commenting:

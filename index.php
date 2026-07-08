@@ -225,12 +225,7 @@ $allTags = $tagManager->getAllTags();
                 <div class="editor-content">
                     <div class="editor-pane">
                         <h4>📝 Editor</h4>
-                        <textarea id="markdownEditor" placeholder="Start writing your markdown here..." 
-                                  spellcheck="false"
-                                  autocomplete="off"
-                                  data-lpignore="true"
-                                  data-1p-ignore="true"
-                                  name="markdown_content_field"></textarea>
+                        <div id="markdownEditor" class="monaco-host"></div>
                     </div>
                     <div class="preview-pane">
                         <h4 id="previewPaneHeader">👁️ Preview</h4>
@@ -488,6 +483,8 @@ $allTags = $tagManager->getAllTags();
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+    <script src="assets/js/monaco-markdown.js"></script>
     <script src="assets/js/app.js"></script>
 </body>
 </html>

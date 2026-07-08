@@ -929,17 +929,18 @@ textarea[data-1p-ignore="true"] {
 
 #markdownEditor {
     flex: 1;
-    padding: 1rem;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    border: none;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 0.9rem;
-    line-height: 1.6;
-    resize: none;
-    tab-size: 2;
-    overflow-y: auto;
     min-height: 0;
+    overflow: hidden;
+    background-color: var(--bg-primary);
+}
+
+#markdownEditor.monaco-host {
+    padding: 0;
+}
+
+#markdownEditor .monaco-editor,
+#markdownEditor .monaco-editor .overflow-guard {
+    border: none;
 }
 
 #markdownEditor:focus {
@@ -1765,6 +1766,12 @@ textarea[data-1p-ignore="true"] {
     border: none;
     outline: none;
     resize: none;
+}
+
+.fullscreen-mode .editor-pane.fullscreen #markdownEditor {
+    width: 100vw !important;
+    height: calc(100vh - 44px) !important;
+    max-width: 100vw !important;
 }
 
 .fullscreen-mode .preview-pane.fullscreen .markdown-preview {

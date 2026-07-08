@@ -52,7 +52,18 @@ class KnowledgeBase {
         // Editor elements
         this.fileTitle = document.getElementById('fileTitle');
         this.fileTags = document.getElementById('fileTags');
-        this.markdownEditor = document.getElementById('markdownEditor');
+        const editorHost = document.getElementById('markdownEditor');
+        if (window.KBMonaco && editorHost) {
+            this.markdownEditor = window.KBMonaco.create(editorHost, {
+                fontSize: 14,
+                onToggleFullscreen: () => {
+                    const pane = editorHost.closest('.editor-pane');
+                    if (pane) this.togglePaneFullscreen(pane);
+                }
+            });
+        } else {
+            this.markdownEditor = editorHost;
+        }
         this.markdownPreview = document.getElementById('markdownPreview');
         this.currentFileInput = document.getElementById('currentFile');
         // Removed syntax highlighting elements
@@ -805,6 +816,10 @@ class KnowledgeBase {
             if (header) header.style.display = '';
             body.classList.remove('fullscreen-mode');
         }
+        // Relayout Monaco after the DOM has settled into its new size.
+        if (this.markdownEditor && this.markdownEditor.layout) {
+            setTimeout(() => this.markdownEditor.layout(), 60);
+        }
     }
     
     wrapPreviewContent() {
@@ -1555,6 +1570,9 @@ Record how well the prompt works:
         this.welcomeScreen.style.display = 'none';
         this.editorContainer.style.display = 'flex';
         this.editorContainer.classList.add('fade-in');
+        if (this.markdownEditor && this.markdownEditor.layout) {
+            setTimeout(() => this.markdownEditor.layout(), 40);
+        }
         // Always attach single-click handlers for fullscreen
         const editorPaneHeaders = document.querySelectorAll('.editor-pane h4, .preview-pane h4');
         editorPaneHeaders.forEach(header => {
@@ -1579,6 +1597,8 @@ Record how well the prompt works:
 
     handleMarkdownKeydown(e) {
         const textarea = this.markdownEditor;
+        // Monaco handles list/checkbox/mermaid continuation natively.
+        if (textarea && textarea.isMonaco) return;
         const value = textarea.value;
         const cursorPosition = textarea.selectionStart;
         

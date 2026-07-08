@@ -312,7 +312,38 @@ $darkClass = $style === 'dark' ? 'dark' : 'light';
             overflow-x: auto;
             background: transparent !important;
         }
-        
+
+        /* Plain-text code blocks (```text): wrap nicely, no scrollbar */
+        pre[class*="language-text"],
+        pre[class*="language-none"],
+        pre[class*="language-plaintext"],
+        pre[class*="language-plain"] {
+            overflow: visible;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        body.dark pre[class*="language-text"],
+        body.dark pre[class*="language-none"],
+        body.dark pre[class*="language-plaintext"],
+        body.dark pre[class*="language-plain"] {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        pre code.language-text,
+        pre code.language-none,
+        pre code.language-plaintext,
+        pre code.language-plain {
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            overflow-x: visible;
+            text-shadow: none;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            line-height: 1.6;
+        }
+
         /* Mermaid diagram styling */
         .mermaid {
             text-align: center;
