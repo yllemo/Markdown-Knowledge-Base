@@ -71,7 +71,7 @@ $boot = [
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="https://www.masswerk.at/mespeak/mespeak.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-<script src="vendor/html-docx.js"></script>
+<script src="lib/html-docx.js"></script>
 </head>
 <body>
 

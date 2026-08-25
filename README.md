@@ -336,7 +336,7 @@ Open a knowledge-base file in a print- and export-oriented reader (same `file=` 
 - Relative images resolve against the file’s folder under `content/`
 - Opens **only** the requested file (no new/open/copy UI on `index.php`; use `print/print.html` for the standalone dropzone variant)
 
-**Related files:** `print/index.php`, `print/print-app.js`, `print/print.css`, `print/vendor/html-docx.js`
+**Related files:** `print/index.php`, `print/print-app.js`, `print/print.css`, `print/lib/html-docx.js`
 
 #### Collaboration View
 Share a markdown file for collaborative review with inline commenting:
