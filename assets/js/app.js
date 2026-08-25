@@ -306,13 +306,34 @@ class KnowledgeBase {
 
     async loadInitialData() {
         try {
-            await this.refreshFileList();
             await this.refreshTagList();
+            const initialTag = this.getTagFromQueryString();
+            if (initialTag) {
+                await this.filterByTag(initialTag);
+            } else {
+                await this.refreshFileList();
+            }
             // Setup click handlers after content is loaded
             this.setupDoubleClickHandlers();
         } catch (error) {
             console.error('Error loading initial data:', error);
         }
+    }
+
+    getTagFromQueryString() {
+        const params = new URLSearchParams(window.location.search);
+        const tag = params.get('tag');
+        return tag && tag.trim() ? tag.trim() : '';
+    }
+
+    setTagQueryString(tagName) {
+        const url = new URL(window.location.href);
+        if (tagName) {
+            url.searchParams.set('tag', tagName);
+        } else {
+            url.searchParams.delete('tag');
+        }
+        window.history.replaceState({}, '', url);
     }
 
     async refreshFileList() {
@@ -1929,17 +1950,22 @@ Record how well the prompt works:
         // Debounce search
         clearTimeout(this.searchTimeout);
         this.searchTimeout = setTimeout(async () => {
-            if (query.trim() === '') {
+            const trimmed = query.trim();
+            if (trimmed === '') {
                 // Clear search - reset to normal view
                 this.isSearchActive = false;
                 this.clearSearchUI();
                 this.syncQuickTagButtonsFromInput();
+                this.setTagQueryString('');
                 await this.refreshFileList();
                 return;
             }
 
+            const tagMatch = trimmed.match(/^tag:(\S+)$/i);
+            this.setTagQueryString(tagMatch ? tagMatch[1] : '');
+
             try {
-                const response = await fetch(`api/search.php?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`api/search.php?q=${encodeURIComponent(trimmed)}`);
                 const payload = await response.json();
                 if (!response.ok || !Array.isArray(payload)) {
                     console.error('Search failed:', !response.ok ? response.status : payload);
@@ -1985,6 +2011,7 @@ Record how well the prompt works:
             // Update search input to show filter
             this.searchInput.value = `tag:${tagName}`;
             this.syncQuickTagButtonsFromInput();
+            this.setTagQueryString(tagName);
         } catch (error) {
             console.error('Tag filter error:', error);
         }
@@ -2023,6 +2050,7 @@ Record how well the prompt works:
             this.searchInput.value = '';
             this.isSearchActive = false;
             this.clearSearchUI();
+            this.setTagQueryString('');
             await this.refreshFileList();
             this.syncQuickTagButtonsFromInput();
             return;

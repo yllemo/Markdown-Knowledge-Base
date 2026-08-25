@@ -56,6 +56,7 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
   - SVG image inversion for dark/light mode compatibility
   - Full-text search across all content
 - **Standalone Markdown Viewer** - Direct viewing of .md files with themes and interactive features
+- **Print & Export** — `/print/?file=…` for print-ready reading, PDF/DOCX/HTML export, TTS, and search
 - **Monaco Editor** — VS Code–style markdown editing in the main app (split preview), plus standalone `/edit` and `/admin` editors
 - **Collaboration System** - Professional team collaboration features:
   - **Block-level Comments**: Comment on any paragraph, heading, list, or diagram
@@ -136,6 +137,7 @@ MDKB features powerful full-text search that searches across:
 
 **Search Features:**
 - **Quick Tag Filters**: Configurable quick-access buttons for your most important tags (customizable in config)
+- **Deep links**: Open the main app with a tag pre-selected via `/?tag=prio` (fills the search box with `tag:prio` and filters the file list; URL stays in sync when you toggle tags)
 - **Strict Term Matching**: All search terms must match (AND logic) for more precise results
 - **Unicode Support**: Full UTF-8 support for international characters and symbols
 - **Relevance Scoring**: Results are ranked by relevance (more matches = higher rank)
@@ -317,6 +319,24 @@ MDKB uses the [Monaco Editor](https://microsoft.github.io/monaco-editor/) (the s
 - In-memory only in `/edit` — changes are not written to the server unless you save elsewhere
 
 **Implementation:** `assets/js/monaco-markdown.js` (main app adapter), Monaco 0.52.2 via jsDelivr CDN
+
+#### Print & Export Viewer
+Open a knowledge-base file in a print- and export-oriented reader (same `file=` loading pattern as `/edit`):
+
+**Usage:**
+- `/print/?file=filename.md` — load from `content/`
+- `/print/?file=folder/note.md` — nested paths supported
+
+**Features:**
+- **Document / Markdown modes** — rendered preview or Monaco source editor (edits stay in the browser until you export)
+- **Toolbar**: statistics, text-to-speech (+ MP3), in-document search (Ctrl+F), print, and **Save as** (PDF, DOCX, HTML, Markdown, plain text)
+- **Mermaid** diagrams with configurable version, width, and alignment (settings saved in `localStorage`)
+- **Optional TOC**, font size, and page width
+- **Title from first `#` heading** — toolbar brand and HTML `<title>` use the first H1 in the file (falls back to “MD Print”)
+- Relative images resolve against the file’s folder under `content/`
+- Opens **only** the requested file (no new/open/copy UI on `index.php`; use `print/print.html` for the standalone dropzone variant)
+
+**Related files:** `print/index.php`, `print/print-app.js`, `print/print.css`, `print/vendor/html-docx.js`
 
 #### Collaboration View
 Share a markdown file for collaborative review with inline commenting:
