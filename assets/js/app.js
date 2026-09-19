@@ -79,6 +79,9 @@ class KnowledgeBase {
         this.deleteBtn = document.getElementById('deleteBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         this.viewBtn = document.getElementById('viewBtn');
+        this.viewDropdownBtn = document.getElementById('viewDropdownBtn');
+        this.viewDropdown = document.getElementById('viewDropdown');
+        this.viewDropdownContainer = document.getElementById('viewDropdownContainer');
         this.closeBtn = document.getElementById('closeBtn');
         
         // Export/Import elements
@@ -108,7 +111,13 @@ class KnowledgeBase {
             e.preventDefault();
             this.downloadFile();
         });
-        this.viewBtn.addEventListener('click', () => this.viewFile());
+        this.viewBtn.addEventListener('click', () => this.viewFile('dark'));
+        if (this.viewDropdownBtn) {
+            this.viewDropdownBtn.addEventListener('click', (e) => this.toggleViewDropdown(e));
+        }
+        if (this.viewDropdown) {
+            this.viewDropdown.addEventListener('click', (e) => this.handleViewSelection(e));
+        }
         this.closeBtn.addEventListener('click', () => this.closeEditor());
         
         // Settings operations
@@ -1234,9 +1243,72 @@ Record how well the prompt works:
 
     handleDocumentClick(e) {
         // Close template dropdown if clicking outside
-        if (!this.newFileDropdownContainer.contains(e.target)) {
+        if (this.newFileDropdownContainer && !this.newFileDropdownContainer.contains(e.target)) {
             this.newFileDropdownContainer.classList.remove('open');
         }
+        if (this.viewDropdownContainer && !this.viewDropdownContainer.contains(e.target)) {
+            this.closeViewDropdown();
+        }
+    }
+
+    toggleViewDropdown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!this.viewDropdownContainer) return;
+        const willOpen = !this.viewDropdownContainer.classList.contains('open');
+        if (this.newFileDropdownContainer) {
+            this.newFileDropdownContainer.classList.remove('open');
+        }
+        this.viewDropdownContainer.classList.toggle('open', willOpen);
+        if (this.viewDropdownBtn) {
+            this.viewDropdownBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        }
+    }
+
+    closeViewDropdown() {
+        if (!this.viewDropdownContainer) return;
+        this.viewDropdownContainer.classList.remove('open');
+        if (this.viewDropdownBtn) {
+            this.viewDropdownBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    handleViewSelection(e) {
+        e.stopPropagation();
+        const item = e.target.closest('.view-menu-item');
+        if (!item) return;
+        const mode = item.dataset.view;
+        this.closeViewDropdown();
+        this.viewFile(mode);
+    }
+
+    viewFile(mode = 'dark') {
+        if (!this.currentFile) {
+            this.showNotification('No file selected', 'error');
+            return;
+        }
+
+        const fileToView = this.currentFileRelativePath || this.currentFile;
+        const fileQ = encodeURIComponent(fileToView);
+        let viewUrl;
+
+        switch (mode) {
+            case 'light':
+                viewUrl = `view/?file=${fileQ}&style=light`;
+                break;
+            case 'colab':
+                viewUrl = `colab/?file=${fileQ}&style=dark`;
+                break;
+            case 'print':
+                viewUrl = `print/?file=${fileQ}`;
+                break;
+            case 'dark':
+            default:
+                viewUrl = `view/?file=${fileQ}&style=dark`;
+                break;
+        }
+
+        window.open(viewUrl, '_blank');
     }
 
     async handleLoadFile(event) {
@@ -1527,20 +1599,6 @@ Record how well the prompt works:
         document.body.removeChild(link);
         
         this.showNotification('Download started!', 'success');
-    }
-
-    viewFile() {
-        if (!this.currentFile) {
-            this.showNotification('No file selected', 'error');
-            return;
-        }
-
-        // Use the relative path for the view URL, similar to filemanager implementation
-        const fileToView = this.currentFileRelativePath || this.currentFile;
-        const viewUrl = `view/?file=${encodeURIComponent(fileToView)}&style=dark`;
-        
-        // Open in new tab
-        window.open(viewUrl, '_blank');
     }
 
     closeEditor() {

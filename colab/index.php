@@ -27,8 +27,103 @@ require_once __DIR__ . '/ParsedownExtra.php';
 
 $content = file_get_contents($filePath);
 
-// Remove YAML front matter
-$content = preg_replace('/^---[\s\S]*?---\s+/', '', $content, 1);
+/**
+ * Parse simple YAML front matter into [key, value] pairs.
+ * Supports scalars, inline lists [a, b], and "- item" lists.
+ *
+ * @return array{0: list<array{0: string, 1: string|list<string>}>, 1: string} [meta, body]
+ */
+function colab_extract_frontmatter(string $text): array
+{
+    if (!preg_match('/^\xEF\xBB\xBF?---[ \t]*\R([\s\S]*?)\R---[ \t]*\R?/', $text, $m)) {
+        return [[], $text];
+    }
+
+    $body = substr($text, strlen($m[0]));
+    $meta = [];
+    $lines = preg_split('/\R/', $m[1]) ?: [];
+    $current = null;
+
+    $unquote = static function (string $s): string {
+        $s = trim($s);
+        if (preg_match('/^["\'](.*)["\']$/', $s, $q)) {
+            return $q[1];
+        }
+        return $s;
+    };
+
+    foreach ($lines as $raw) {
+        if (trim($raw) === '' || strpos(ltrim($raw), '#') === 0) {
+            continue;
+        }
+
+        if (preg_match('/^\s+-\s+(.*)$/', $raw, $listItem) && $current !== null && is_array($current[1])) {
+            $current[1][] = $unquote($listItem[1]);
+            $meta[count($meta) - 1] = $current;
+            continue;
+        }
+
+        if (!preg_match('/^([A-Za-zÅÄÖåäö0-9_\-. ]+):\s*(.*)$/u', $raw, $kv)) {
+            continue;
+        }
+
+        $key = trim($kv[1]);
+        $val = trim($kv[2]);
+
+        if ($val === '') {
+            $current = [$key, []];
+        } elseif (preg_match('/^\[.*\]$/', $val)) {
+            $items = array_values(array_filter(array_map($unquote, explode(',', substr($val, 1, -1))), static fn ($v) => $v !== ''));
+            $current = [$key, $items];
+        } else {
+            $current = [$key, $unquote($val)];
+        }
+        $meta[] = $current;
+    }
+
+    // Empty arrays (key with no list items) → empty string
+    $meta = array_map(static function ($pair) {
+        if (is_array($pair[1]) && count($pair[1]) === 0) {
+            return [$pair[0], ''];
+        }
+        return $pair;
+    }, $meta);
+
+    return [$meta, $body];
+}
+
+/**
+ * @param list<array{0: string, 1: string|list<string>}> $meta
+ */
+function colab_frontmatter_html(array $meta): string
+{
+    if ($meta === []) {
+        return '';
+    }
+
+    $esc = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $rows = '';
+    foreach ($meta as [$key, $val]) {
+        $label = $esc(ucfirst($key));
+        if (is_array($val)) {
+            $cell = '';
+            foreach ($val as $item) {
+                $cell .= '<span class="fm-tag">' . $esc((string) $item) . '</span>';
+            }
+        } else {
+            $cell = $esc((string) $val);
+        }
+        $rows .= '<tr><td class="fm-key">' . $label . '</td><td class="fm-val">' . $cell . '</td></tr>';
+    }
+
+    return '<aside class="fm-box" aria-label="Document metadata">'
+        . '<div class="fm-heading">Metadata</div>'
+        . '<table class="fm-table"><tbody>' . $rows . '</tbody></table>'
+        . '</aside>';
+}
+
+[$frontmatterMeta, $content] = colab_extract_frontmatter($content);
+$frontmatterHtml = colab_frontmatter_html($frontmatterMeta);
 
 $Parsedown = new ParsedownExtra();
 $Parsedown->setSafeMode(false);
@@ -113,6 +208,8 @@ $html = preg_replace(
 
 $title = htmlspecialchars(pathinfo(basename($filename), PATHINFO_FILENAME));
 $darkClass = $style === 'dark' ? 'dark' : 'light';
+$viewStyle = $style === 'dark' ? 'dark' : 'light';
+$viewUrl = '../view/?file=' . rawurlencode($filename) . '&style=' . $viewStyle;
 $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
@@ -615,6 +712,7 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
             padding: 0.5rem 0;
             margin-bottom: 1rem;
             border-bottom: 1px solid #eee;
@@ -630,20 +728,117 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+        .colab-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-left: auto;
+        }
+        .colab-header-view {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.25rem 0.65rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            color: #0077cc;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .colab-header-view:hover {
+            background: rgba(0, 119, 204, 0.08);
+            border-color: #0077cc;
+        }
+        body.dark .colab-header-view {
+            color: #66aaff;
+            border-color: #444;
+        }
+        body.dark .colab-header-view:hover {
+            background: rgba(102, 170, 255, 0.12);
+            border-color: #66aaff;
+        }
         .colab-header-user {
             cursor: pointer;
         }
         .colab-header-user:hover { text-decoration: underline; }
+
+        /* YAML front matter */
+        .fm-box {
+            margin: 0 0 1.75rem;
+            padding: 0.95rem 1.15rem;
+            background: #f4f8fb;
+            border: 1px solid #d5dde3;
+            border-left: 4px solid #0077cc;
+            border-radius: 8px;
+        }
+        body.dark .fm-box {
+            background: #161b22;
+            border-color: #30363d;
+            border-left-color: #66aaff;
+        }
+        .fm-heading {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #0077cc;
+            margin: 0 0 0.55rem;
+        }
+        body.dark .fm-heading { color: #66aaff; }
+        .fm-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .fm-table td {
+            border: none;
+            padding: 0.28rem 0;
+            vertical-align: top;
+            background: transparent;
+        }
+        .fm-key {
+            color: #0077cc;
+            font-weight: 600;
+            white-space: nowrap;
+            padding-right: 1.25rem !important;
+            width: 1%;
+        }
+        body.dark .fm-key { color: #8cb8ff; }
+        .fm-val {
+            color: inherit;
+            line-height: 1.45;
+        }
+        .fm-tag {
+            display: inline-block;
+            background: #fff;
+            border: 1px solid #d5dde3;
+            border-radius: 999px;
+            padding: 0.05em 0.65em;
+            margin: 0 0.3em 0.25em 0;
+            font-size: 0.82rem;
+        }
+        body.dark .fm-tag {
+            background: #21262d;
+            border-color: #3d444d;
+            color: #e6edf3;
+        }
     </style>
 </head>
 <body class="<?= $darkClass ?>">
     <!-- Colab header -->
     <div class="colab-header">
         <span class="colab-header-label">Collaboration View</span>
-        <span class="colab-header-user" id="colabUser" title="Click to change name"></span>
+        <div class="colab-header-actions">
+            <a class="colab-header-view" href="<?= htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') ?>" title="Open in viewer (<?= htmlspecialchars($viewStyle, ENT_QUOTES, 'UTF-8') ?>)">👁️ View</a>
+            <span class="colab-header-user" id="colabUser" title="Click to change name"></span>
+        </div>
     </div>
 
     <div class="markdown-body">
+        <?= $frontmatterHtml ?>
         <?= $html ?>
     </div>
 
@@ -699,7 +894,7 @@ $filenameJs = htmlspecialchars($filename, ENT_QUOTES, 'UTF-8');
 
     <!-- Mermaid -->
     <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.esm.min.mjs';
         const isDark = document.body.classList.contains('dark');
         if (isDark) {
             const lt = document.querySelector('link[href*="prism.min.css"]');

@@ -129,6 +129,7 @@ $isDark = $style === 'dark';
         .toolbar-actions {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
         .btn {
             padding: 6px 14px;
@@ -139,6 +140,11 @@ $isDark = $style === 'dark';
             font-size: 13px;
             cursor: pointer;
             transition: background 0.15s;
+            text-decoration: none;
+        }
+        a.btn {
+            display: inline-flex;
+            align-items: center;
         }
         .btn:hover {
             background: <?= $isDark ? '#4c4c4c' : '#e8e8e8' ?>;
@@ -196,6 +202,7 @@ $isDark = $style === 'dark';
     <div class="toolbar">
         <div class="toolbar-filename"><?= htmlspecialchars($filename) ?></div>
         <div class="toolbar-actions">
+            <a class="btn" href="<?= htmlspecialchars('../view/?file=' . rawurlencode($filename) . '&style=' . ($isDark ? 'dark' : 'light'), ENT_QUOTES, 'UTF-8') ?>" title="Open in viewer (<?= $isDark ? 'dark' : 'light' ?>)">👁️ View</a>
             <button class="btn btn-success" onclick="saveFile()" title="Save changes to file" id="save-btn">Save</button>
             <button class="btn btn-primary" onclick="downloadFile()" title="Download markdown file">Download .md</button>
         </div>
@@ -217,6 +224,108 @@ $isDark = $style === 'dark';
         var editor;
 
         require(['vs/editor/editor.main'], function () {
+            var BULLET_RE = /^(\s*)([-*+])(\s+)(\[[ xX]\]\s+)?/;
+            var NUMBERED_RE = /^(\s*)(\d+)([.)])(\s+)/;
+
+            monaco.languages.registerCompletionItemProvider('markdown', {
+                // No triggerCharacters — suggestions only via Ctrl+Space
+                provideCompletionItems: function (model, position) {
+                    var word = model.getWordUntilPosition(position);
+                    var range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn,
+                        endColumn: word.endColumn
+                    };
+                    var K = monaco.languages.CompletionItemKind;
+                    var snippet = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
+                    function item(label, detail, insertText) {
+                        return {
+                            label: label,
+                            kind: K.Snippet,
+                            detail: detail,
+                            insertText: insertText,
+                            insertTextRules: snippet,
+                            range: range
+                        };
+                    }
+                    return {
+                        suggestions: [
+                            item('bullet', 'Bullet list item', '- ${1:item}\n$0'),
+                            item('task', 'Unchecked task', '- [ ] ${1:task}\n$0'),
+                            item('done', 'Checked task', '- [x] ${1:task}\n$0'),
+                            item('number', 'Numbered list item', '1. ${1:item}\n$0'),
+                            item('h1', 'Heading 1', '# ${1:Title}\n$0'),
+                            item('h2', 'Heading 2', '## ${1:Title}\n$0'),
+                            item('h3', 'Heading 3', '### ${1:Title}\n$0'),
+                            item('bold', 'Bold', '**${1:text}**$0'),
+                            item('italic', 'Italic', '*${1:text}*$0'),
+                            item('link', 'Link', '[${1:text}](${2:https://})$0'),
+                            item('image', 'Image', '![${1:alt}](${2:path})$0'),
+                            item('code', 'Fenced code block', '```${1:language}\n${2:code}\n```\n$0'),
+                            item('quote', 'Blockquote', '> ${1:quote}\n$0'),
+                            item('hr', 'Horizontal rule', '\n---\n$0'),
+                            item('table', 'Table', '| ${1:A} | ${2:B} |\n| --- | --- |\n| ${3: } | ${4: } |\n$0'),
+                            item('mermaid', 'Mermaid flowchart', '```mermaid\ngraph TD\n    ${1:A}[${2:Start}] --> ${3:B}[${4:End}]\n```\n$0'),
+                            item('frontmatter', 'YAML front matter', '---\ntitle: ${1:Title}\ntags: ${2:tag}\n---\n$0')
+                        ]
+                    };
+                }
+            });
+
+            function isSuggestVisible() {
+                try {
+                    var svc = editor._contextKeyService;
+                    if (svc && typeof svc.getContextKeyValue === 'function') {
+                        return svc.getContextKeyValue('suggestWidgetVisible') === true;
+                    }
+                } catch (e) { /* ignore */ }
+                return false;
+            }
+
+            function handleListEnter() {
+                var model = editor.getModel();
+                var sel = editor.getSelection();
+                if (!model || !sel || !sel.isEmpty()) return false;
+
+                var pos = sel.getPosition();
+                var line = model.getLineContent(pos.lineNumber);
+                var beforeCursor = line.substring(0, pos.column - 1);
+                var bullet = beforeCursor.match(BULLET_RE);
+                var numbered = beforeCursor.match(NUMBERED_RE);
+                if (!bullet && !numbered) return false;
+
+                var match = bullet || numbered;
+                var markerLen = match[0].length;
+                var rest = line.substring(markerLen);
+
+                if (rest.trim() === '' && pos.column - 1 <= markerLen) {
+                    editor.executeEdits('kb-list-end', [{
+                        range: new monaco.Range(pos.lineNumber, 1, pos.lineNumber, markerLen + 1),
+                        text: ''
+                    }]);
+                    editor.setPosition({ lineNumber: pos.lineNumber, column: 1 });
+                    return true;
+                }
+
+                var indent = match[1];
+                var newMarker;
+                if (bullet) {
+                    var checkbox = bullet[4] ? '[ ] ' : '';
+                    newMarker = indent + bullet[2] + ' ' + checkbox;
+                } else {
+                    var next = parseInt(numbered[2], 10) + 1;
+                    newMarker = indent + next + numbered[3] + ' ';
+                }
+
+                editor.executeEdits('kb-list-continue', [{
+                    range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column),
+                    text: '\n' + newMarker
+                }]);
+                editor.setPosition({ lineNumber: pos.lineNumber + 1, column: newMarker.length + 1 });
+                return true;
+            }
+
             editor = monaco.editor.create(document.getElementById('editor-container'), {
                 value: fileContent,
                 language: 'markdown',
@@ -227,7 +336,22 @@ $isDark = $style === 'dark';
                 fontSize: 14,
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
-                padding: { top: 10 }
+                padding: { top: 10 },
+                tabSize: 2,
+                // Completions only when Ctrl+Space is pressed
+                quickSuggestions: false,
+                suggestOnTriggerCharacters: false,
+                wordBasedSuggestions: 'off',
+                snippetSuggestions: 'inline'
+            });
+
+            editor.onKeyDown(function (e) {
+                if (e.keyCode === monaco.KeyCode.Enter && !e.shiftKey && !isSuggestVisible()) {
+                    if (handleListEnter()) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                }
             });
             
             // Track changes to show save status

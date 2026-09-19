@@ -205,7 +205,42 @@ $allTags = $tagManager->getAllTags();
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
                         <button id="deleteBtn" class="btn btn-danger">🗑️ Delete</button>
                         <button id="downloadBtn" class="btn btn-primary">⬇️ Download</button>
-                        <button id="viewBtn" class="btn btn-primary">👁️ View</button>
+                        <div class="view-dropdown" id="viewDropdownContainer">
+                            <button id="viewBtn" class="btn btn-primary btn-split-left" title="Open viewer (dark)">👁️ View</button>
+                            <button id="viewDropdownBtn" class="btn btn-primary btn-split-right" title="Choose presentation" type="button" aria-haspopup="true" aria-expanded="false">
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div id="viewDropdown" class="view-menu" role="menu">
+                                <button type="button" class="view-menu-item" data-view="dark" role="menuitem">
+                                    <span class="view-menu-icon">🌙</span>
+                                    <span class="view-menu-text">
+                                        <span class="view-menu-name">Dark</span>
+                                        <span class="view-menu-desc">Viewer · dark theme</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="view-menu-item" data-view="light" role="menuitem">
+                                    <span class="view-menu-icon">☀️</span>
+                                    <span class="view-menu-text">
+                                        <span class="view-menu-name">Light</span>
+                                        <span class="view-menu-desc">Viewer · light theme</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="view-menu-item" data-view="colab" role="menuitem">
+                                    <span class="view-menu-icon">💬</span>
+                                    <span class="view-menu-text">
+                                        <span class="view-menu-name">Colab</span>
+                                        <span class="view-menu-desc">Collaboration view</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="view-menu-item" data-view="print" role="menuitem">
+                                    <span class="view-menu-icon">🖨️</span>
+                                    <span class="view-menu-text">
+                                        <span class="view-menu-name">Print</span>
+                                        <span class="view-menu-desc">Print &amp; export</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
                         <button id="closeBtn" class="btn btn-secondary">✕ Close</button>
                     </div>
                 </div>
