@@ -53,7 +53,16 @@ class KnowledgeBase {
         this.fileTitle = document.getElementById('fileTitle');
         this.fileTags = document.getElementById('fileTags');
         const editorHost = document.getElementById('markdownEditor');
-        if (window.KBMonaco && editorHost) {
+        if (editorHost && (this.isMobile() || window.matchMedia('(pointer: coarse)').matches)) {
+            // Native editing supports touch selection and mobile keyboards directly.
+            const textarea = document.createElement('textarea');
+            textarea.className = 'mobile-markdown-editor';
+            textarea.setAttribute('aria-label', 'Markdown editor');
+            textarea.setAttribute('autocapitalize', 'sentences');
+            textarea.spellcheck = true;
+            editorHost.appendChild(textarea);
+            this.markdownEditor = textarea;
+        } else if (window.KBMonaco && editorHost) {
             this.markdownEditor = window.KBMonaco.create(editorHost, {
                 fontSize: 14,
                 onToggleFullscreen: () => {
@@ -768,6 +777,30 @@ class KnowledgeBase {
 
     // Mobile functionality
     setupMobileView() {
+        document.getElementById('mobileToolsBtn').addEventListener('click', (event) => {
+            const open = document.querySelector('.app-header').classList.toggle('mobile-tools-open');
+            event.currentTarget.setAttribute('aria-expanded', String(open));
+        });
+        document.getElementById('editorToolsBtn').addEventListener('click', (event) => {
+            const open = this.editorContainer.classList.toggle('editor-tools-open');
+            event.currentTarget.setAttribute('aria-expanded', String(open));
+        });
+        const updateViewport = () => {
+            const viewport = window.visualViewport;
+            if (viewport && viewport.scale !== 1) return;
+            const height = viewport ? viewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--mobile-height', `${height}px`);
+            const editing = document.activeElement === this.markdownEditor
+                || (document.body.classList.contains('mobile-typing')
+                    && document.activeElement.closest('.editor-actions')
+                    && !this.editorContainer.classList.contains('preview-mode'));
+            document.body.classList.toggle('mobile-typing', this.isMobile() && editing);
+        };
+        window.addEventListener('resize', updateViewport);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', updateViewport);
+        document.addEventListener('focusin', updateViewport);
+        document.addEventListener('focusout', () => requestAnimationFrame(updateViewport));
+        updateViewport();
         this.handleResize();
     }
 
@@ -889,6 +922,8 @@ class KnowledgeBase {
         if (!isMobile) {
             this.closeMobileMenu();
             this.editorContainer.classList.remove('preview-mode');
+            this.mobileToggleBtn.textContent = '👁️ Preview';
+            this.mobileToggleBtn.setAttribute('aria-pressed', 'false');
         }
     }
 
@@ -915,12 +950,16 @@ class KnowledgeBase {
         if (isPreviewMode) {
             this.editorContainer.classList.remove('preview-mode');
             this.mobileToggleBtn.textContent = '👁️ Preview';
+            if (this.markdownEditor.layout) this.markdownEditor.layout();
+            this.markdownEditor.focus();
         } else {
             this.editorContainer.classList.add('preview-mode');
+            document.body.classList.remove('mobile-typing');
             this.mobileToggleBtn.textContent = '📝 Edit';
             // Update preview when switching to preview mode
             this.updatePreview();
         }
+        this.mobileToggleBtn.setAttribute('aria-pressed', String(!isPreviewMode));
     }
 
     handleFileClick(e) {
@@ -1299,6 +1338,9 @@ Record how well the prompt works:
             case 'colab':
                 viewUrl = `colab/?file=${fileQ}&style=dark`;
                 break;
+            case 'reader':
+                viewUrl = `read/?file=${fileQ}`;
+                break;
             case 'print':
                 viewUrl = `print/?file=${fileQ}`;
                 break;
@@ -1609,6 +1651,7 @@ Record how well the prompt works:
         }
 
         this.editorContainer.style.display = 'none';
+        document.body.classList.remove('mobile-typing');
         this.welcomeScreen.style.display = 'flex';
         this.currentFile = '';
         this.currentFileRelativePath = '';
@@ -1675,6 +1718,7 @@ Record how well the prompt works:
     }
 
     handleMarkdownKeydown(e) {
+        if (e.isComposing || e.keyCode === 229) return;
         const textarea = this.markdownEditor;
         // Monaco handles list/checkbox/mermaid continuation natively.
         if (textarea && textarea.isMonaco) return;

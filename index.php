@@ -6,6 +6,9 @@ ob_start();
 
 require_once 'config/config.php';
 
+// Revalidate the page so updated asset URLs reach returning browsers.
+header('Cache-Control: no-cache');
+
 // Check authentication
 if (!isAuthenticated()) {
     header('Location: login.php');
@@ -30,14 +33,14 @@ $allTags = $tagManager->getAllTags();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title><?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?></title>
     <?php 
     $favicon_path = getConfig('favicon_path');
     if ($favicon_path && file_exists($favicon_path)): ?>
     <link rel="icon" type="image/x-icon" href="<?= htmlspecialchars($favicon_path) ?>">
     <?php endif; ?>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/styles.css?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/css/styles.css'), 0, 12) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css">
 </head>
 <body>
@@ -45,7 +48,7 @@ $allTags = $tagManager->getAllTags();
         <!-- Header -->
         <header class="app-header">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <button id="mobileMenuBtn" class="mobile-menu-btn" style="display: none;">☰</button>
+                <button id="mobileMenuBtn" class="mobile-menu-btn" style="display: none;" aria-label="Open file menu">☰</button>
                 <h1 id="headerTitle" style="cursor: pointer;">
                     <?php 
                     $header_icon_path = getConfig('header_icon_path');
@@ -57,7 +60,8 @@ $allTags = $tagManager->getAllTags();
                     <?= htmlspecialchars(getConfig('site_title', 'Knowledge Base')) ?>
                 </h1>
             </div>
-            <div class="header-actions">
+            <button id="mobileToolsBtn" class="btn btn-secondary mobile-only" type="button" aria-expanded="false" aria-controls="headerActions">Tools</button>
+            <div class="header-actions" id="headerActions">
                 <div class="header-search-cluster">
                 <?php
                 $quickTags = getConfig('quick_filter_tags', ['top', 'prio', 'signal']);
@@ -201,8 +205,9 @@ $allTags = $tagManager->getAllTags();
                            data-1p-ignore="true"
                            name="file_title_field">
                     <div class="editor-actions">
-                        <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;">👁️ Preview</button>
+                        <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;" aria-pressed="false">👁️ Preview</button>
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
+                        <button id="editorToolsBtn" class="btn btn-secondary mobile-only" type="button" aria-expanded="false">More ▾</button>
                         <button id="deleteBtn" class="btn btn-danger">🗑️ Delete</button>
                         <button id="downloadBtn" class="btn btn-primary">⬇️ Download</button>
                         <div class="view-dropdown" id="viewDropdownContainer">
@@ -230,6 +235,13 @@ $allTags = $tagManager->getAllTags();
                                     <span class="view-menu-text">
                                         <span class="view-menu-name">Colab</span>
                                         <span class="view-menu-desc">Collaboration view</span>
+                                    </span>
+                                </button>
+                                <button type="button" class="view-menu-item" data-view="reader" role="menuitem">
+                                    <span class="view-menu-icon">📖</span>
+                                    <span class="view-menu-text">
+                                        <span class="view-menu-name">Läsfokus</span>
+                                        <span class="view-menu-desc">Läs i din egen takt</span>
                                     </span>
                                 </button>
                                 <button type="button" class="view-menu-item" data-view="print" role="menuitem">
@@ -519,7 +531,7 @@ $allTags = $tagManager->getAllTags();
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
-    <script src="assets/js/monaco-markdown.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script src="assets/js/monaco-markdown.js?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/js/monaco-markdown.js'), 0, 12) ?>"></script>
+    <script src="assets/js/app.js?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/js/app.js'), 0, 12) ?>"></script>
 </body>
 </html>

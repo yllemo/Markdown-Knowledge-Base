@@ -6,6 +6,8 @@ ob_start();
 
 require_once 'config/config.php';
 
+header('Cache-Control: no-cache');
+
 // Check if setup is needed - only if password protection is enabled but no password is set
 if (getConfig('password_protected') && empty(getConfig('password'))) {
     header('Location: setup.php');
@@ -52,7 +54,7 @@ $site_title = getConfig('site_title', 'Knowledge Base');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($site_title) ?> - Login</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/styles.css?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/css/styles.css'), 0, 12) ?>">
     <style>
         .login-container {
             display: flex;
@@ -156,7 +158,7 @@ $site_title = getConfig('site_title', 'Knowledge Base');
             font-size: 0.8rem;
         }
         
-        .debug-info {
+        .login-notice {
             background-color: rgba(74, 158, 255, 0.1);
             border: 1px solid rgba(74, 158, 255, 0.3);
             color: var(--accent-primary);
@@ -175,19 +177,12 @@ $site_title = getConfig('site_title', 'Knowledge Base');
                 <p>Enter your password to access the knowledge base</p>
             </div>
             
-            <?php if (isset($_GET['debug'])): ?>
-                <div class="debug-info">
-                    <strong>Debug Mode Active</strong><br>
-                    <a href="login.php">Remove debug mode</a>
-                </div>
-            <?php endif; ?>
-            
             <?php if ($error): ?>
                 <div class="error-message"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
             
             <?php if (isset($show_logout_message) && $show_logout_message): ?>
-                <div class="debug-info">
+                <div class="login-notice">
                     <strong>✅ You have been logged out successfully</strong><br>
                     <?php if (getConfig('password_protected')): ?>
                         <p>Please enter your password to log back in.</p>
@@ -210,9 +205,8 @@ $site_title = getConfig('site_title', 'Knowledge Base');
             
             <div class="login-footer">
                 <p>Secure cookie-based authentication</p>
-                <p><a href="login.php?debug=1">Debug Mode</a> | <a href="debug.php">Full Debug</a></p>
             </div>
         </div>
     </div>
 </body>
-</html> 
+</html>
