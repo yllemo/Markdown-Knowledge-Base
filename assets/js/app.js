@@ -134,6 +134,13 @@ class KnowledgeBase {
         this.settingsBtn.addEventListener('click', () => this.openSettingsModal());
         this.saveSettingsBtn.addEventListener('click', () => this.saveSettings());
         document.getElementById('createContentRootBtn').addEventListener('click', () => this.createContentRoot());
+        document.getElementById('generateMcpKey').addEventListener('click', () => this.manageMcpKey('generate_mcp_key'));
+        document.getElementById('revokeMcpKey').addEventListener('click', () => this.manageMcpKey('revoke_mcp_key'));
+        document.getElementById('copyMcpKey').addEventListener('click', async () => {
+            const field = document.getElementById('mcpKeyValue');
+            try { await navigator.clipboard.writeText(field.value); this.showNotification('Nyckeln kopierad', 'success'); }
+            catch { field.focus(); field.select(); this.showNotification('Kopiera den markerade nyckeln manuellt', 'info'); }
+        });
         this.resetSettingsBtn.addEventListener('click', () => this.resetSettings());
         this.changePasswordBtn.addEventListener('click', () => this.changePassword());
         
@@ -571,6 +578,8 @@ class KnowledgeBase {
     }
 
     closeSettingsModal() {
+        document.getElementById('mcpKeyValue').value = '';
+        document.getElementById('mcpNewKey').hidden = true;
         if (this.settingsModal) {
             this.settingsModal.classList.remove('show');
         }
@@ -580,6 +589,11 @@ class KnowledgeBase {
         try {
             const response = await fetch('api/settings.php');
             const settings = await response.json();
+            this.mcpCsrf = settings.mcp_csrf;
+            document.getElementById('mcpEndpoint').value = new URL('mcp/', window.location.href).href;
+            document.getElementById('mcpKeyValue').value = '';
+            document.getElementById('mcpNewKey').hidden = true;
+            this.updateMcpStatus(settings.mcp_key_active);
             
             // Populate form fields
             document.getElementById('siteTitle').value = settings.site_title || '';
@@ -600,6 +614,33 @@ class KnowledgeBase {
             console.error('Error loading settings:', error);
             this.showNotification('Error loading settings', 'error');
         }
+    }
+
+    updateMcpStatus(active) {
+        document.getElementById('mcpKeyStatus').textContent = active ? 'En API-nyckel är aktiv.' : 'Ingen aktiv nyckel – MCP är låst.';
+        document.getElementById('revokeMcpKey').disabled = !active;
+    }
+
+    async manageMcpKey(action) {
+        const generate = document.getElementById('generateMcpKey');
+        const revoke = document.getElementById('revokeMcpKey');
+        generate.disabled = revoke.disabled = true;
+        try {
+            const response = await fetch('api/settings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-MCP-CSRF': this.mcpCsrf || '' },
+                body: JSON.stringify({ action })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || 'Kunde inte ändra nyckeln');
+            document.getElementById('mcpKeyValue').value = data.key || '';
+            document.getElementById('mcpNewKey').hidden = !data.key;
+            this.updateMcpStatus(data.active);
+            this.showNotification(data.active ? 'Ny nyckel skapad' : 'Nyckeln återkallad', 'success');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+            revoke.disabled = false;
+        } finally { generate.disabled = false; }
     }
 
     async createContentRoot() {

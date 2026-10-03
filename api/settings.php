@@ -2,9 +2,7 @@
 // api/settings.php - API endpoint for settings management
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Cache-Control: no-store');
 
 require_once '../config/config.php';
 
@@ -37,6 +35,8 @@ try {
 function handleGet() {
     // Return current settings
     $settings = [
+        'mcp_key_active' => !empty(getConfig('mcp_key', [])['hash']),
+        'mcp_csrf' => hash_hmac('sha256', 'mcp-key:' . ($_COOKIE['kb_auth'] ?? ''), getConfig('password')),
         'site_title' => getConfig('site_title'),
         'current_knowledgebase' => getConfig('current_knowledgebase'),
         'knowledgebases' => getAvailableKnowledgebases(),
@@ -68,6 +68,21 @@ function handlePost() {
     $action = $input['action'] ?? '';
 
     switch ($action) {
+        case 'generate_mcp_key':
+        case 'revoke_mcp_key':
+            $expected = hash_hmac('sha256', 'mcp-key:' . ($_COOKIE['kb_auth'] ?? ''), getConfig('password'));
+            if (!hash_equals($expected, $_SERVER['HTTP_X_MCP_CSRF'] ?? '')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Invalid security token. Reopen settings.']);
+                return;
+            }
+            $key = $action === 'generate_mcp_key' ? 'mdkb_' . bin2hex(random_bytes(32)) : null;
+            if (!saveConfig('mcp_key', $key === null ? [] : ['hash' => hash('sha256', $key)])) {
+                throw new Exception('Could not save MCP key.');
+            }
+            echo json_encode(['success' => true, 'key' => $key, 'active' => $key !== null]);
+            break;
+
         case 'create_root':
             handleCreateRoot($input);
             break;

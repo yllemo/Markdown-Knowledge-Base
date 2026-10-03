@@ -3,6 +3,9 @@
 
 RewriteEngine On
 
+# Preserve Bearer authentication when PHP runs through CGI/FastCGI.
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Basic API routing - only if mod_rewrite is available
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

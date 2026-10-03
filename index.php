@@ -438,6 +438,23 @@ $allTags = $tagManager->getAllTags();
                 </div>
                 
                 <div class="settings-section">
+                    <h3>MCP – anslut en AI-klient</h3>
+                    <p>Ger läsåtkomst till sparad innehållsroot: sök i innehåll och taggar, lista och läs dokument. Kräver MCP 2026-07-28 och en Bearer-nyckel via HTTPS.</p>
+                    <div class="setting-group">
+                        <label for="mcpEndpoint">Serveradress</label>
+                        <input id="mcpEndpoint" type="url" readonly>
+                    </div>
+                    <p id="mcpKeyStatus" role="status"></p>
+                    <button type="button" id="generateMcpKey" class="btn btn-primary">Generera ny nyckel</button>
+                    <button type="button" id="revokeMcpKey" class="btn btn-secondary">Återkalla nyckel</button>
+                    <p>En ny nyckel ersätter den tidigare direkt. Ändringen sparas direkt, oberoende av Save Settings.</p>
+                    <div id="mcpNewKey" class="setting-group" hidden>
+                        <label for="mcpKeyValue">Kopiera nyckeln nu – den visas bara denna gång</label>
+                        <input id="mcpKeyValue" type="text" readonly autocomplete="off" spellcheck="false">
+                        <button type="button" id="copyMcpKey" class="btn btn-secondary">Kopiera nyckel</button>
+                    </div>
+                </div>
+                <div class="settings-section">
                     <h3>File recovery</h3>
                     <p>The main editor keeps recovery copies before changing or deleting files (up to 10 per filename). Scheduled backups are not implemented. Use Export to download a ZIP backup.</p>
                 </div>
