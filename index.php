@@ -208,6 +208,7 @@ $allTags = $tagManager->getAllTags();
                         <button id="mobileToggleBtn" class="mobile-toggle" style="display: none;" aria-pressed="false">👁️ Preview</button>
                         <button id="saveBtn" class="btn btn-success">💾 Save</button>
                         <button id="editorToolsBtn" class="btn btn-secondary mobile-only" type="button" aria-expanded="false">More ▾</button>
+                        <button id="clearCompletedTasksBtn" class="btn btn-secondary" type="button" title="Ta bort alla rader med färdiga uppgifter">✓ Rensa färdiga</button>
                         <button id="deleteBtn" class="btn btn-danger">🗑️ Delete</button>
                         <button id="downloadBtn" class="btn btn-primary">⬇️ Download</button>
                         <div class="view-dropdown" id="viewDropdownContainer">
@@ -345,7 +346,7 @@ $allTags = $tagManager->getAllTags();
                                name="site_title_field">
                     </div>
                     <div class="setting-group">
-                        <label for="currentKnowledgebase">Current Knowledge Base</label>
+                        <label for="currentKnowledgebase">Content root</label>
                         <select id="currentKnowledgebase" class="form-select">
                             <?php 
                             $knowledgebases = getAvailableKnowledgebases();
@@ -356,7 +357,12 @@ $allTags = $tagManager->getAllTags();
                                 <option value="<?= htmlspecialchars($value) ?>" <?= $selected ?>><?= htmlspecialchars($label) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <small>Select which knowledge base to work with. 'All Knowledge Bases' shows all content.</small>
+                        <small>Choose the starting folder for files, search and tags. New files are saved here. Save settings to apply; existing files are not moved.</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="newContentRoot">Create a content root</label>
+                        <input type="text" id="newContentRoot" placeholder="e.g. 2026" maxlength="64" autocomplete="off">
+                        <button type="button" id="createContentRootBtn" class="btn btn-secondary">Create and select</button>
                     </div>
                     <div class="setting-group">
                         <label for="sessionTimeout">Session Timeout (minutes)</label>
@@ -412,8 +418,8 @@ $allTags = $tagManager->getAllTags();
                     <h3>Security Settings</h3>
                     <div class="setting-group checkbox-group">
                         <label>
-                            <input type="checkbox" id="passwordProtected">
-                            Enable password protection
+                            <input type="checkbox" id="passwordProtected" checked disabled>
+                            Password protection is always enabled
                         </label>
                     </div>
                     <div class="setting-group">
@@ -432,21 +438,8 @@ $allTags = $tagManager->getAllTags();
                 </div>
                 
                 <div class="settings-section">
-                    <h3>Backup Settings</h3>
-                    <div class="setting-group checkbox-group">
-                        <label>
-                            <input type="checkbox" id="backupEnabled">
-                            Enable automatic backups
-                        </label>
-                    </div>
-                    <div class="setting-group">
-                        <label for="backupInterval">Backup Interval (hours)</label>
-                        <input type="number" id="backupInterval" min="1" max="168" step="1">
-                    </div>
-                    <div class="setting-group">
-                        <label for="maxBackups">Maximum Backups</label>
-                        <input type="number" id="maxBackups" min="1" max="100" step="1">
-                    </div>
+                    <h3>File recovery</h3>
+                    <p>The main editor keeps recovery copies before changing or deleting files (up to 10 per filename). Scheduled backups are not implemented. Use Export to download a ZIP backup.</p>
                 </div>
             </div>
             <div class="settings-footer">
@@ -532,6 +525,7 @@ $allTags = $tagManager->getAllTags();
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
     <script src="assets/js/monaco-markdown.js?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/js/monaco-markdown.js'), 0, 12) ?>"></script>
+    <script src="assets/js/markdown-tasks.js?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/js/markdown-tasks.js'), 0, 12) ?>"></script>
     <script src="assets/js/app.js?v=<?= substr(hash_file('sha256', __DIR__ . '/assets/js/app.js'), 0, 12) ?>"></script>
 </body>
 </html>

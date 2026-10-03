@@ -13,14 +13,14 @@ if (!isAuthenticated()) {
     exit;
 }
 
-$baseDir = realpath(__DIR__ . '/../content');
+$baseDir = realpath(getCurrentContentPath());
 $action = $_POST['action'] ?? null;
 $target = $_POST['target'] ?? null;
 $searchQuery = $_GET['search'] ?? '';
 $response = '';
 
 // Initialize search engine
-$searchEngine = new SearchEngine('../content');
+$searchEngine = new SearchEngine($baseDir);
 $searchResults = [];
 
 // Handle search requests
@@ -147,7 +147,7 @@ function listRootFiles($dir, $base) {
             $safePath = htmlspecialchars($path);
             $encodedRelPath = htmlspecialchars($relPath, ENT_QUOTES);
             $name = htmlspecialchars($item);
-            $viewUrl = "../view/?file=" . urlencode($relPath) . "&style=dark";
+            $viewUrl = "../view/?file=" . urlencode(str_replace('\\', '/', substr($path, strlen(realpath(__DIR__ . '/../content')) + 1))) . "&style=dark";
             $result .= "<div class='file'><span>📄</span> <a href=\"$viewUrl\" target=\"_blank\" style=\"color:#fff;\">$name</a>
                 <button onclick=\"editFile('$encodedRelPath')\">Edit</button>
                 <button onclick=\"renameFile('$encodedRelPath')\">Rename</button>
@@ -299,7 +299,7 @@ function listRootFiles($dir, $base) {
     </style>
 </head>
 <body>
-    <h1>📂 File Manager (../content)</h1>
+    <h1>📂 File Manager (<?= htmlspecialchars(getConfig('current_knowledgebase') ?: 'root') ?>)</h1>
     <?php if ($response): ?>
         <div class="response"><?= $response ?></div>
     <?php endif; ?>
@@ -353,7 +353,7 @@ function listRootFiles($dir, $base) {
                             </div>
                         <?php endif; ?>
                         <div style="margin-top: 8px;">
-                            <button onclick="editFile('<?= htmlspecialchars($result['relative_path'], ENT_QUOTES) ?>')" 
+                            <button onclick="editFile('<?= htmlspecialchars(str_replace('\\', '/', substr($result['path'], strlen($baseDir) + 1)), ENT_QUOTES) ?>')"
                                     style="font-size: 12px;">Edit</button>
                         </div>
                     </div>
@@ -393,7 +393,7 @@ function listRootFiles($dir, $base) {
 
     <script>
         function editFile(relPath) {
-            const fullPath = "<?= $baseDir ?>/" + relPath;
+            const fullPath = <?= json_encode(str_replace('\\', '/', $baseDir) . '/') ?> + relPath;
             fetch("?read=" + encodeURIComponent(relPath))
                 .then(res => res.ok ? res.text() : Promise.reject("File not found"))
                 .then(text => {

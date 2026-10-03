@@ -43,7 +43,7 @@ A modern, open source, self-hosted Markdown knowledge base that puts you in comp
 - Tagging and search for fast organization
 - Responsive design (desktop & mobile)
 - File uploads with type/size restrictions
-- Auto-save and backup support
+- Auto-save and recovery copies before file changes (up to 10 per filename)
 - Browse and filter by tags or files
 - Dark and light themes
 - Custom favicon and header icon support
@@ -106,7 +106,7 @@ For production environments:
 3. **Secure:**
    - Enable HTTPS
    - Set proper file permissions
-   - Configure regular backups
+   - Download ZIP backups using Export (scheduled backups are not implemented)
 
 ## Comparison with Alternatives
 
@@ -377,6 +377,12 @@ Share a markdown file for collaborative review with inline commenting:
 - **Site Title**: Customize the title displayed in the header and browser tab
 - **Theme**: Choose between dark and light themes
 - **Editor Settings**: Adjust font size, auto-save interval, and more
+
+Password protection is always enabled and cannot be switched off in Settings or the API. The standalone `/edit/` view also requires login.
+
+In **Settings → General Settings → Content root**, select the folder to start from, or enter a new folder name such as `2026` and click **Create and select**, then **Save Settings**. Files, search, tags, file management, imports and exports use that folder and its subfolders. New documents are saved there; existing files are not moved. Choose **All Knowledge Bases** to return to the full content tree. Save or close any edited document before applying settings.
+
+The main editor keeps recovery copies when changing or deleting files. The old automatic-backup settings were unused and have been removed; use **Export** for a downloadable ZIP backup.
 
 ## Contributing
 

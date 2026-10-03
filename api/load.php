@@ -13,7 +13,7 @@ requireAuthentication();
 
 require_once '../classes/FileManager.php';
 
-$fileManager = new FileManager('../content');
+$fileManager = new FileManager(getCurrentContentPath());
 
 try {
     $method = $_SERVER['REQUEST_METHOD'];

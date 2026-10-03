@@ -112,6 +112,7 @@ class KnowledgeBase {
         this.loadFileBtn.addEventListener('click', () => this.loadFileInput.click());
         this.loadFileInput.addEventListener('change', (e) => this.handleLoadFile(e));
         this.saveBtn.addEventListener('click', () => this.saveFile());
+        document.getElementById('clearCompletedTasksBtn').addEventListener('click', () => this.clearCompletedTasks());
         this.deleteBtn.addEventListener('click', () => this.deleteFile());
         // Remove all previous listeners from downloadBtn
         this.downloadBtn.replaceWith(this.downloadBtn.cloneNode(true));
@@ -132,6 +133,7 @@ class KnowledgeBase {
         // Settings operations
         this.settingsBtn.addEventListener('click', () => this.openSettingsModal());
         this.saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+        document.getElementById('createContentRootBtn').addEventListener('click', () => this.createContentRoot());
         this.resetSettingsBtn.addEventListener('click', () => this.resetSettings());
         this.changePasswordBtn.addEventListener('click', () => this.changePassword());
         
@@ -581,15 +583,14 @@ class KnowledgeBase {
             
             // Populate form fields
             document.getElementById('siteTitle').value = settings.site_title || '';
-            document.getElementById('currentKnowledgebase').value = settings.current_knowledgebase || 'root';
+            const roots = document.getElementById('currentKnowledgebase');
+            roots.replaceChildren(...Object.entries(settings.knowledgebases || {}).map(([value, label]) => new Option(label, value)));
+            roots.value = settings.current_knowledgebase || 'root';
             document.getElementById('sessionTimeout').value = Math.floor((settings.session_timeout || 31536000) / 60);
             document.getElementById('sidebarWidth').value = settings.sidebar_width || 300;
             document.getElementById('editorFontSize').value = settings.editor_font_size || 14;
             document.getElementById('autoSaveInterval').value = Math.floor((settings.auto_save_interval || 30000) / 1000);
-            document.getElementById('passwordProtected').checked = settings.password_protected || false;
-            document.getElementById('backupEnabled').checked = settings.backup_enabled || false;
-            document.getElementById('backupInterval').value = Math.floor((settings.backup_interval || 86400) / 3600);
-            document.getElementById('maxBackups').value = settings.max_backups || 10;
+            document.getElementById('passwordProtected').checked = true;
             
             // Load favicon and header icon
             this.updateFileDisplay('favicon', settings.favicon_path);
@@ -601,7 +602,31 @@ class KnowledgeBase {
         }
     }
 
+    async createContentRoot() {
+        const button = document.getElementById('createContentRootBtn');
+        button.disabled = true;
+        try {
+            const response = await fetch('api/settings.php', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create_root', name: document.getElementById('newContentRoot').value.trim() })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || 'Could not create root');
+            const roots = document.getElementById('currentKnowledgebase');
+            roots.add(new Option(result.name, result.name));
+            roots.value = result.name;
+            document.getElementById('newContentRoot').value = '';
+            this.showNotification('Root created. Save settings to start using it.', 'success');
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+        } finally { button.disabled = false; }
+    }
+
     async saveSettings() {
+        if (this.unsavedChanges) {
+            this.showNotification('Save or close your document before changing settings.', 'error');
+            return;
+        }
         try {
             // Helper function to parse integer with fallback
             const parseIntSafe = (value, fallback) => {
@@ -616,10 +641,6 @@ class KnowledgeBase {
                 sidebar_width: parseIntSafe(document.getElementById('sidebarWidth').value, 300),
                 editor_font_size: parseIntSafe(document.getElementById('editorFontSize').value, 14),
                 auto_save_interval: parseIntSafe(document.getElementById('autoSaveInterval').value, 30) * 1000,
-                password_protected: document.getElementById('passwordProtected').checked,
-                backup_enabled: document.getElementById('backupEnabled').checked,
-                backup_interval: parseIntSafe(document.getElementById('backupInterval').value, 24) * 3600,
-                max_backups: parseIntSafe(document.getElementById('maxBackups').value, 10)
             };
 
             const response = await fetch('api/settings.php', {
@@ -667,10 +688,7 @@ class KnowledgeBase {
                 document.getElementById('sidebarWidth').value = 300;
                 document.getElementById('editorFontSize').value = 14;
                 document.getElementById('autoSaveInterval').value = 30;
-                document.getElementById('passwordProtected').checked = false;
-                document.getElementById('backupEnabled').checked = true;
-                document.getElementById('backupInterval').value = 24;
-                document.getElementById('maxBackups').value = 10;
+                document.getElementById('passwordProtected').checked = true;
                 
                 this.showNotification('Settings reset to defaults', 'info');
                 
@@ -1715,6 +1733,26 @@ Record how well the prompt works:
     onEditorChange() {
         this.updatePreview();
         this.markUnsaved();
+    }
+
+    clearCompletedTasks() {
+        const result = window.KBTasks.removeCompleted(this.markdownEditor.value);
+        if (!result.count) {
+            this.showNotification('Inga färdiga uppgifter att ta bort.', 'info');
+            return;
+        }
+        const editor = this.markdownEditor.getMonaco?.();
+        if (editor) {
+            editor.pushUndoStop();
+            editor.executeEdits('remove-completed-tasks', [{
+                range: editor.getModel().getFullModelRange(), text: result.content
+            }]);
+            editor.pushUndoStop();
+        } else {
+            this.markdownEditor.value = result.content;
+        }
+        this.onEditorChange();
+        this.showNotification(`${result.count} färdiga uppgifter borttagna.`, 'success');
     }
 
     handleMarkdownKeydown(e) {

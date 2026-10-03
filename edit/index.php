@@ -1,5 +1,10 @@
 <?php
 // index.php - Markdown Editor (Monaco Editor)
+require_once __DIR__ . '/../config/config.php';
+if (!isAuthenticated()) {
+    header('Location: ../login.php');
+    exit;
+}
 
 $filename = isset($_GET['file']) ? $_GET['file'] : '';
 $style = isset($_GET['style']) ? strtolower($_GET['style']) : 'light';
@@ -95,6 +100,7 @@ $isDark = $style === 'dark';
     <div class="toolbar">
         <div class="toolbar-filename"><?= htmlspecialchars($filename) ?></div>
         <div class="toolbar-actions">
+            <button class="btn" id="clearCompletedTasksBtn" type="button" onclick="clearCompletedTasks()" disabled>✓ Rensa färdiga</button>
             <button class="btn btn-primary" onclick="downloadFile()" title="Download markdown file">Download .md</button>
         </div>
     </div>
@@ -104,6 +110,7 @@ $isDark = $style === 'dark';
         var fileContent = <?= json_encode($content, JSON_UNESCAPED_UNICODE) ?>;
         var fileName = <?= json_encode(basename($filename)) ?>;
     </script>
+    <script src="../assets/js/markdown-tasks.js?v=<?= substr(hash_file('sha256', __DIR__ . '/../assets/js/markdown-tasks.js'), 0, 12) ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
     <script>
         require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' } });
@@ -123,7 +130,19 @@ $isDark = $style === 'dark';
                 scrollBeyondLastLine: false,
                 padding: { top: 10 }
             });
+            document.getElementById('clearCompletedTasksBtn').disabled = false;
         });
+
+        function clearCompletedTasks() {
+            if (!editor) return;
+            var result = window.KBTasks.removeCompleted(editor.getValue());
+            if (!result.count) return;
+            editor.pushUndoStop();
+            editor.executeEdits('remove-completed-tasks', [{
+                range: editor.getModel().getFullModelRange(), text: result.content
+            }]);
+            editor.pushUndoStop();
+        }
 
         function downloadFile() {
             var content = editor ? editor.getValue() : fileContent;

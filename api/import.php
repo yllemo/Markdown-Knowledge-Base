@@ -23,8 +23,8 @@ try {
         exit;
     }
 
-    $fileManager = new FileManager('../content');
-    $contentDir = '../content';
+    $contentDir = getCurrentContentPath();
+    $fileManager = new FileManager($contentDir);
     
     // Ensure content directory exists
     if (!is_dir($contentDir)) {

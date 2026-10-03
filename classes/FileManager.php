@@ -7,6 +7,7 @@ class FileManager {
     public function __construct($contentDir = 'content') {
         $this->contentDir = $contentDir;
         $this->ensureContentDirectory();
+        $this->contentDir = realpath($this->contentDir);
     }
     
     private function ensureContentDirectory() {
@@ -18,30 +19,9 @@ class FileManager {
     public function getAllFiles() {
         $files = [];
         
-        // Check if we're using root (show all) or specific knowledgebase
-        $currentKb = getConfig('current_knowledgebase', '');
-        
-        if (empty($currentKb) || $currentKb === 'root') {
-            // Show files from all knowledgebases
-            $this->scanFilesRecursively($this->contentDir, $files);
-        } else {
-            // Show files from specific knowledgebase only
-            $pattern = $this->contentDir . '/*.md';
-            foreach (glob($pattern) as $filePath) {
-                $fileName = basename($filePath);
-                // For specific KB, relative path is just the filename since contentDir is already the KB folder
-                $files[] = [
-                    'name' => $fileName,
-                    'relative_path' => $fileName,
-                    'display_name' => $this->getDisplayName($fileName),
-                    'path' => $filePath,
-                    'modified' => filemtime($filePath),
-                    'size' => filesize($filePath),
-                    'knowledgebase' => $currentKb
-                ];
-            }
-        }
-        
+        // Include every folder below the selected content root.
+        $this->scanFilesRecursively($this->contentDir, $files);
+
         // Sort by modification time (newest first)
         usort($files, function($a, $b) {
             return $b['modified'] - $a['modified'];
@@ -50,7 +30,7 @@ class FileManager {
         return $files;
     }
     
-    private function scanFilesRecursively($dir, &$files, $knowledgebaseName = '') {
+    private function scanFilesRecursively($dir, &$files) {
         if (!is_dir($dir)) {
             return;
         }
@@ -58,9 +38,10 @@ class FileManager {
         // Get files in current directory
         $pattern = $dir . '/*.md';
         foreach (glob($pattern) as $filePath) {
+            if (is_link($filePath)) continue;
             $fileName = basename($filePath);
             // Calculate relative path from base content directory
-            $relativePath = $knowledgebaseName ? $knowledgebaseName . '/' . $fileName : $fileName;
+            $relativePath = $this->calculateRelativePath($filePath);
             
             $files[] = [
                 'name' => $fileName,
@@ -69,22 +50,19 @@ class FileManager {
                 'path' => $filePath,
                 'modified' => filemtime($filePath),
                 'size' => filesize($filePath),
-                'knowledgebase' => $knowledgebaseName ?: 'root'
+                'knowledgebase' => strpos($relativePath, '/') !== false ? explode('/', $relativePath)[0] : 'root'
             ];
         }
         
-        // Scan subdirectories (knowledgebases)
-        if (empty($knowledgebaseName)) { // Only scan subdirs at root level
-            $items = scandir($dir);
-            foreach ($items as $item) {
-                $path = $dir . '/' . $item;
-                if ($item !== '.' && $item !== '..' && is_dir($path)) {
-                    $this->scanFilesRecursively($path, $files, $item);
-                }
+        // Recurse into ordinary folders, excluding recovery copies and links.
+        foreach (scandir($dir) as $item) {
+            $path = $dir . '/' . $item;
+            if ($item[0] !== '.' && !is_link($path) && is_dir($path)) {
+                $this->scanFilesRecursively($path, $files);
             }
         }
     }
-    
+
     public function getFile($fileName) {
         // $fileName might be a relative path like "knowledgebase/file.md" or just "file.md"
         $filePath = $this->getFilePath($fileName);
@@ -97,7 +75,7 @@ class FileManager {
         
         return [
             'name' => basename($fileName), // Just the filename
-            'relative_path' => $fileName,  // The full relative path
+            'relative_path' => $this->calculateRelativePath($filePath),
             'content' => $content,
             'modified' => filemtime($filePath),
             'size' => filesize($filePath)
@@ -370,17 +348,22 @@ class FileManager {
     }
     
     private function getFilePath($fileName) {
-        // If fileName contains a path separator, it might be a relative path from content root
-        if (strpos($fileName, '/') !== false) {
-            // For files like "knowledgebase/file.md", we need to go up to the base content directory
-            $baseContentDir = dirname($this->contentDir) . '/content';
-            return $baseContentDir . '/' . $fileName;
+        if (!is_string($fileName) || $fileName === '' || strpos($fileName, '..') !== false
+            || strpos($fileName, '\\') !== false || strpos($fileName, ':') !== false
+            || strpos($fileName, "\0") !== false || $fileName[0] === '/') {
+            throw new Exception('Invalid file path');
         }
-        
-        // For simple filenames, use the current content directory
-        return $this->contentDir . '/' . $fileName;
+        $base = dirname(__DIR__) . '/content';
+        $candidate = strpos($fileName, '/') !== false ? $base . '/' . $fileName : $this->contentDir . '/' . $fileName;
+        $parent = realpath(dirname($candidate));
+        $scope = realpath($this->contentDir);
+        if (!$parent || !$scope || ($parent !== $scope && strpos($parent, $scope . DIRECTORY_SEPARATOR) !== 0)
+            || is_link($candidate)) {
+            throw new Exception('File path outside selected content root');
+        }
+        return $parent . DIRECTORY_SEPARATOR . basename($candidate);
     }
-    
+
     private function sanitizeFileName($fileName) {
         // Remove only truly unsafe filesystem characters, preserve international chars like åäö
         $fileName = preg_replace('/[<>:"|*?\\/\\\\]/', '-', $fileName);
@@ -572,41 +555,17 @@ class FileManager {
     }
     
     private function determineTargetDirectory($fileName, $knowledgebaseContext) {
-        // If the filename already contains a path (like 'kb/file.md'), preserve the directory
-        if (strpos($fileName, '/') !== false) {
-            $pathParts = explode('/', $fileName);
-            $kbName = $pathParts[0];
-            $baseContentDir = dirname($this->contentDir);
-            return $baseContentDir . '/content/' . $kbName;
+        if (strpos($fileName, '/') !== false) return dirname($this->getFilePath($fileName));
+        if ($knowledgebaseContext && !in_array($knowledgebaseContext, ['root', 'current'], true)) {
+            return dirname($this->getFilePath($knowledgebaseContext . '/' . basename($fileName)));
         }
-        
-        // For new files or files without path context
-        if ($knowledgebaseContext === 'current' || $knowledgebaseContext === null) {
-            // Use the current content directory (already set by getCurrentContentPath)
-            return $this->contentDir;
-        }
-        
-        // If a specific knowledgebase is provided
-        if ($knowledgebaseContext && $knowledgebaseContext !== 'root') {
-            $baseContentDir = dirname($this->contentDir);
-            return $baseContentDir . '/content/' . $knowledgebaseContext;
-        }
-        
-        // Default to current content directory
         return $this->contentDir;
     }
-    
+
     private function calculateRelativePath($fullPath) {
-        // Calculate relative path from the base content directory
-        $baseContentDir = dirname($this->contentDir) . '/content';
-        
-        // If the path starts with the base content dir, make it relative
-        if (strpos($fullPath, $baseContentDir) === 0) {
-            $relativePath = substr($fullPath, strlen($baseContentDir) + 1);
-            return $relativePath;
-        }
-        
-        // Fallback to just the filename
-        return basename($fullPath);
+        $base = str_replace('\\', '/', realpath(dirname(__DIR__) . '/content'));
+        $path = str_replace('\\', '/', $fullPath);
+        if (strpos($path, $base . '/') !== 0) throw new Exception('File is outside content');
+        return substr($path, strlen($base) + 1);
     }
 }

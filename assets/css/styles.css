@@ -1998,10 +1998,12 @@ textarea[data-1p-ignore="true"] {
     .editor-actions > #saveBtn,
     .editor-actions > #editorToolsBtn { flex: 1; margin: 0; }
     .editor-actions > #deleteBtn,
+    .editor-actions > #clearCompletedTasksBtn,
     .editor-actions > #downloadBtn,
     .editor-actions > .view-dropdown,
     .editor-actions > #closeBtn { display: none; }
     .editor-tools-open .editor-actions > #deleteBtn,
+    .editor-tools-open .editor-actions > #clearCompletedTasksBtn,
     .editor-tools-open .editor-actions > #downloadBtn,
     .editor-tools-open .editor-actions > .view-dropdown,
     .editor-tools-open .editor-actions > #closeBtn { display: inline-flex; }
